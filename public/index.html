@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e0e;
+    --bg1: #121212;
+    --bg2: #161616;
+    --border: #222222;
+    --text: #e8e8e0;
+    --text-dim: #888880;
+    --text-faint: #444440;
+    --accent: #3d6b4f;
+    --accent-dim: #2a4a37;
+    --red: #cc5555;
+    --amber: #c4a261;
+    --sidebar-w: 280px;
+    --header-h: 38px;
+    --term-header-h: 30px;
+    --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+    --font-display: 'Playfair Display', Georgia, serif;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ─────────────────────────────────── */
+  #header {
+    height: var(--header-h);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    flex-shrink: 0;
+    background: var(--bg1);
+  }
+
+  #app-name {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--text);
+  }
+
+  #header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .term-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.connected { background: var(--accent); }
+  .dot.error { background: var(--red); }
+
+  /* ── Layout ──────────────────────────────────── */
+  #content {
+    display: flex;
+    height: calc(100vh - var(--header-h));
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ─────────────────────────────────── */
+  #sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--bg1);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .panel {
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.25s ease;
+  }
+
+  .panel-header {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 9px 14px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg1);
+    cursor: pointer;
+    user-select: none;
+  }
+  .panel-header:hover { color: var(--text); }
+  .panel-header .panel-title { pointer-events: none; }
+
+  .panel-body {
+    padding: 10px 14px;
+    background: var(--bg);
+  }
+  .panel-body.collapsed { display: none; }
+
+  /* ── Shared form elements ─────────────────────── */
+  select, input[type="text"], input[type="number"] {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 8px;
+    outline: none;
+  }
+  select { width: 100%; cursor: pointer; }
+  select:focus, input:focus { border-color: var(--accent); }
+
+  textarea {
+    width: 100%;
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 8px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.6;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-faint); }
+
+  .field-label {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .btn {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 5px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--text); }
+  .btn:active { background: var(--accent-dim); }
+
+  .btn-accent {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+  .btn-accent:hover { border-color: var(--accent); color: var(--text); }
+
+  .icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 2px;
+    line-height: 1;
+    font-family: var(--font-mono);
+  }
+  .icon-btn:hover { color: var(--text); }
+
+  .feedback-line {
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    height: 16px;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    text-transform: uppercase;
+  }
+  .feedback-line.visible { opacity: 1; }
+
+  /* ── Git Panel ───────────────────────────────── */
+  #git-branch-line {
+    font-size: 10px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    letter-spacing: 0.04em;
+  }
+
+  .git-output {
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.6;
+    max-height: 120px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  #git-status-output { color: var(--text); margin-top: 6px; }
+
+  #git-error {
+    font-size: 10px;
+    color: var(--red);
+    display: none;
+  }
+
+  /* ── CLAUDE.md Panel ─────────────────────────── */
+  #claudemd-path {
+    font-size: 9px;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+    word-break: break-all;
+  }
+
+  /* ── Memory Panel ────────────────────────────── */
+  #memory-list {
+    margin-bottom: 10px;
+  }
+
+  .memory-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .memory-entry:last-child { border-bottom: none; }
+
+  .memory-entry-body { flex: 1; min-width: 0; }
+
+  .memory-entry-desc {
+    font-size: 10px;
+    color: var(--text);
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  .memory-entry-type {
+    font-size: 9px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 1px;
+  }
+
+  #memory-empty {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 4px 0;
+  }
+
+  .memory-form-sep {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+  }
+
+  /* ── Recent Panel ────────────────────────────── */
+  .session-entry {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-entry:last-child { border-bottom: none; }
+
+  .session-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+
+  .session-project {
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .session-time {
+    font-size: 9px;
+    color: var(--text-faint);
+  }
+
+  .session-msg {
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5;
+  }
+
+  #recent-empty {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+
+  /* ── Settings Panel ──────────────────────────── */
+  .project-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .project-row:last-child { border-bottom: none; }
+
+  .project-name {
+    font-size: 10px;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .project-path-full {
+    font-size: 9px;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 2;
+    min-width: 0;
+  }
+
+  #add-project-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  #add-project-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Header action buttons ──────────────────── */
+  .header-action {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .header-action:hover { border-color: var(--accent); color: var(--text); }
+  .header-action.active { border-color: var(--amber); color: var(--amber); }
+
+  /* ── Recap modal ─────────────────────────────── */
+  #recap-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  #recap-modal.open { display: flex; }
+
+  #recap-modal-inner {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    width: 560px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #recap-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  #recap-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+  }
+
+  #recap-text {
+    width: 100%;
+    min-height: 200px;
+    max-height: 400px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 10px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.6;
+  }
+
+  #recap-modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Git cd button ───────────────────────────── */
+  #git-select-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  #git-select-row select { margin-bottom: 0; flex: 1; }
+  #cd-btn { flex: 0; padding: 5px 8px; white-space: nowrap; }
+
+  /* ── To-Do Panel ─────────────────────────────── */
+  .todo-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .todo-item:last-child { border-bottom: none; }
+
+  .todo-check {
+    width: 13px;
+    height: 13px;
+    border: 1px solid var(--border);
+    background: var(--bg1);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--accent);
+  }
+  .todo-check.done { background: var(--accent-dim); border-color: var(--accent); }
+
+  .todo-text {
+    flex: 1;
+    font-size: 10px;
+    color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .todo-text.done { color: var(--text-faint); text-decoration: line-through; }
+
+  #todo-empty {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 4px 0 8px;
+  }
+
+  #todo-add-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  #todo-input { flex: 1; min-width: 0; }
+
+  /* ── Terminals ───────────────────────────────── */
+  #terminals {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .terminal-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .terminal-pane + .terminal-pane {
+    border-top: 1px solid var(--border);
+  }
+
+  .terminal-header {
+    height: var(--term-header-h);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    background: var(--bg1);
+    gap: 8px;
+  }
+
+  .term-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+  }
+
+  .terminal-container {
+    flex: 1;
+    overflow: hidden;
+    padding: 4px;
+    background: var(--bg);
+  }
+
+  .terminal-container .xterm { height: 100%; }
+
+  .terminal-container .xterm-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <span id="app-name">Base</span>
+  <div id="header-right">
+    <button class="header-action" id="brief-btn" title="Send current todos + memory to Claude (Cmd+B)">Brief</button>
+    <button class="header-action" id="recap-btn" title="Ask Claude to summarize this session (Cmd+R)">Recap</button>
+    <div class="term-indicator">
+      <div class="dot" id="dot1"></div>
+      <span>Claude</span>
+    </div>
+    <div class="term-indicator">
+      <div class="dot" id="dot2"></div>
+      <span>Bash</span>
+    </div>
+  </div>
+</div>
+
+<div id="content">
+
+  <div id="sidebar">
+
+    <!-- Git Status -->
+    <div class="panel" id="git-panel">
+      <div class="panel-header" data-panel="git-body">
+        <span class="panel-title">Git Status</span>
+        <span>▾</span>
+      </div>
+      <div class="panel-body" id="git-body">
+        <div id="git-select-row">
+          <select id="project-select">
+            <option value="">— select project —</option>
+          </select>
+          <button class="btn" id="cd-btn" title="cd into project in Terminal 2">cd</button>
+        </div>
+        <div id="git-error"></div>
+        <div id="git-branch-line"></div>
+        <pre class="git-output" id="git-log-output"></pre>
+        <pre class="git-output" id="git-status-output"></pre>
+      </div>
+    </div>
+
+    <!-- CLAUDE.md -->
+    <div class="panel" id="claudemd-panel">
+      <div class="panel-header" data-panel="claudemd-body">
+        <span class="panel-title">CLAUDE.md</span>
+        <span>▾</span>
+      </div>
+      <div class="panel-body collapsed" id="claudemd-body">
+        <div id="claudemd-path"></div>
+        <textarea id="claudemd-input" style="min-height:140px;max-height:360px"></textarea>
+        <div class="btn-row">
+          <button class="btn btn-accent" id="save-claudemd-btn">Save</button>
+        </div>
+        <div class="feedback-line" id="claudemd-feedback"></div>
+      </div>
+    </div>
+
+    <!-- To-Do -->
+    <div class="panel" id="todo-panel">
+      <div class="panel-header" data-panel="todo-body">
+        <span class="panel-title">To-Do</span>
+        <span>▾</span>
+      </div>
+      <div class="panel-body" id="todo-body">
+        <div id="todo-list"></div>
+        <div id="todo-add-row">
+          <input type="text" id="todo-input" placeholder="Add a task... (Cmd+T)">
+          <button class="btn btn-accent" id="todo-add-btn" style="flex:0;padding:5px 10px">Add</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn" id="todo-send-btn">Send to Claude</button>
+        </div>
+        <div class="feedback-line" id="todo-feedback"></div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="panel" id="settings-panel">
+      <div class="panel-header" data-panel="settings-body">
+        <span class="panel-title">Settings</span>
+        <span>▸</span>
+      </div>
+      <div class="panel-body collapsed" id="settings-body">
+        <label class="field-label">Projects</label>
+        <div id="projects-list"></div>
+        <div id="add-project-row">
+          <input type="text" id="add-project-input" placeholder="/path/to/project">
+          <button class="btn" id="add-project-btn" style="flex:0;padding:5px 10px;white-space:nowrap">Add</button>
+        </div>
+        <label class="field-label" style="margin-top:12px">Port</label>
+        <input type="number" id="port-input" value="3000" style="width:80px">
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-accent" id="save-settings-btn">Save</button>
+        </div>
+        <div class="feedback-line" id="settings-feedback"></div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <div id="terminals">
+    <div class="terminal-pane" id="pane1">
+      <div class="terminal-header">
+        <div class="term-dot" id="tdot1"></div>
+        Terminal 1 — Claude Code
+      </div>
+      <div class="terminal-container" id="term1-container"></div>
+    </div>
+    <div class="terminal-pane" id="pane2">
+      <div class="terminal-header">
+        <div class="term-dot" id="tdot2"></div>
+        Terminal 2 — Bash
+      </div>
+      <div class="terminal-container" id="term2-container"></div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Recap capture modal -->
+<div id="recap-modal">
+  <div id="recap-modal-inner">
+    <div id="recap-modal-header">
+      <span>Session Recap</span>
+      <button class="icon-btn" id="recap-modal-close">✕</button>
+    </div>
+    <div id="recap-modal-body">
+      <div id="recap-status" style="font-size:10px;color:var(--text-faint);margin-bottom:10px;">Waiting for Claude to finish...</div>
+      <textarea id="recap-text" placeholder="Claude's summary will appear here. You can edit before saving."></textarea>
+    </div>
+    <div id="recap-modal-footer">
+      <button class="btn" id="recap-capture-btn">Capture from Terminal</button>
+      <button class="btn btn-accent" id="recap-save-btn">Save to Memory</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Utilities ────────────────────────────────────────────────────────────────
+
+function timeAgo(ts) {
+  const d = new Date(ts);
+  if (isNaN(d)) return '';
+  const diffMin = Math.floor((Date.now() - d) / 60000);
+  if (diffMin < 1)  return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24)  return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7)  return `${diffDay}d ago`;
+  return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+}
+
+function showFeedback(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+// ── Panel collapse toggle ─────────────────────────────────────────────────────
+
+document.querySelectorAll('.panel-header[data-panel]').forEach(header => {
+  header.addEventListener('click', () => {
+    const body = document.getElementById(header.dataset.panel);
+    const arrow = header.querySelector('span:last-child');
+    body.classList.toggle('collapsed');
+    if (arrow) arrow.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
+  });
+});
+
+// ── Terminal factory ──────────────────────────────────────────────────────────
+
+const TERM_THEME = {
+  background: '#0e0e0e', foreground: '#e8e8e0',
+  cursor: '#3d6b4f', cursorAccent: '#0e0e0e',
+  selectionBackground: '#3d6b4f50',
+  black: '#111111', red: '#cc5555', green: '#3d6b4f', yellow: '#c4a261',
+  blue: '#5a7fa8', magenta: '#7a5a8a', cyan: '#4a8a8a', white: '#e8e8e0',
+  brightBlack: '#444444', brightRed: '#ee6666', brightGreen: '#4d8b5f',
+  brightYellow: '#d4b271', brightBlue: '#6a8fb8', brightMagenta: '#8a6a9a',
+  brightCyan: '#5a9a9a', brightWhite: '#f8f8f0',
+};
+
+function spawnTerminal(containerId, wsPath, dotId, headerDotId) {
+  const container = document.getElementById(containerId);
+  const dot       = document.getElementById(dotId);
+  const hdot      = document.getElementById(headerDotId);
+
+  const term = new Terminal({
+    fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+    fontSize: 13, lineHeight: 1.25,
+    cursorStyle: 'block', cursorBlink: true,
+    scrollback: 5000, theme: TERM_THEME, allowTransparency: false,
+  });
+
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+  requestAnimationFrame(() => { try { fitAddon.fit(); } catch {} });
+
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${wsProto}//${location.host}${wsPath}`);
+
+  const setStatus = (state) => {
+    [dot, hdot].forEach(d => {
+      if (!d) return;
+      d.classList.remove('connected', 'error');
+      if (state === 'connected') d.classList.add('connected');
+      if (state === 'error')     d.classList.add('error');
+    });
+  };
+
+  ws.onopen    = () => { setStatus('connected'); ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows })); };
+  ws.onmessage = (e) => term.write(typeof e.data === 'string' ? e.data : new Uint8Array(e.data));
+  ws.onerror   = () => setStatus('error');
+  ws.onclose   = () => { setStatus('error'); term.write('\r\n\x1b[33m[disconnected — reload to reconnect]\x1b[0m\r\n'); };
+
+  term.onData(data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+
+  const sendResize = () => {
+    try {
+      fitAddon.fit();
+      if (ws.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    } catch {}
+  };
+
+  new ResizeObserver(sendResize).observe(container);
+  return { term, ws, fitAddon };
+}
+
+const t1 = spawnTerminal('term1-container', '/terminal/1', 'dot1', 'tdot1');
+const t2 = spawnTerminal('term2-container', '/terminal/2', 'dot2', 'tdot2');
+
+// ── Config + Settings ─────────────────────────────────────────────────────────
+
+let config = {};
+let activeProject = '';
+
+async function loadConfig() {
+  const res = await fetch('/api/config');
+  config = await res.json();
+
+  // Git project selector
+  const sel = document.getElementById('project-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— select project —</option>';
+  (config.projects || []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p.split('/').pop(); opt.title = p;
+    sel.appendChild(opt);
+  });
+  if (prev && config.projects?.includes(prev)) sel.value = prev;
+  else if (config.projects?.length === 1) {
+    sel.value = config.projects[0];
+    selectProject(config.projects[0]);
+  }
+
+  // Settings form
+  renderProjectsList(config.projects || []);
+  document.getElementById('port-input').value = config.port || 3000;
+}
+
+function renderProjectsList(projects) {
+  const el = document.getElementById('projects-list');
+  el.innerHTML = '';
+  projects.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'project-row';
+    row.innerHTML = `
+      <span class="project-name" title="${p}">${p.split('/').pop()}</span>
+      <span class="project-path-full" title="${p}">${p}</span>
+      <button class="icon-btn" data-index="${i}" title="Remove">✕</button>
+    `;
+    row.querySelector('.icon-btn').addEventListener('click', () => {
+      config.projects.splice(i, 1);
+      renderProjectsList(config.projects);
+    });
+    el.appendChild(row);
+  });
+}
+
+document.getElementById('add-project-btn').addEventListener('click', () => {
+  const input = document.getElementById('add-project-input');
+  const val = input.value.trim();
+  if (!val) return;
+  if (!config.projects) config.projects = [];
+  config.projects.push(val);
+  renderProjectsList(config.projects);
+  input.value = '';
+});
+
+document.getElementById('add-project-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('add-project-btn').click();
+});
+
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
+  config.port = parseInt(document.getElementById('port-input').value) || 3000;
+  await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  showFeedback('settings-feedback', 'Saved — restart server to apply port change');
+  loadConfig();
+});
+
+// ── Git Status ────────────────────────────────────────────────────────────────
+
+function selectProject(projectPath) {
+  activeProject = projectPath;
+  loadGitStatus(projectPath);
+  loadClaudeMd(projectPath);
+}
+
+async function loadGitStatus(projectPath) {
+  const errEl    = document.getElementById('git-error');
+  const branchEl = document.getElementById('git-branch-line');
+  const logEl    = document.getElementById('git-log-output');
+  const statusEl = document.getElementById('git-status-output');
+  errEl.style.display = 'none';
+  branchEl.textContent = logEl.textContent = statusEl.textContent = '';
+  if (!projectPath) return;
+  try {
+    const data = await fetch(`/api/git?project=${encodeURIComponent(projectPath)}`).then(r => r.json());
+    if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    branchEl.textContent = `⎇  ${data.branch}`;
+    logEl.textContent    = data.log;
+    statusEl.textContent = data.status || '(working tree clean)';
+  } catch (e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  }
+}
+
+document.getElementById('project-select').addEventListener('change', e => selectProject(e.target.value));
+
+// ── CLAUDE.md ─────────────────────────────────────────────────────────────────
+
+async function loadClaudeMd(projectPath) {
+  const url = projectPath ? `/api/claude-md?project=${encodeURIComponent(projectPath)}` : '/api/claude-md';
+  const { content, path } = await fetch(url).then(r => r.json());
+  document.getElementById('claudemd-input').value = content;
+  document.getElementById('claudemd-path').textContent = path;
+}
+
+document.getElementById('save-claudemd-btn').addEventListener('click', async () => {
+  const content = document.getElementById('claudemd-input').value;
+  await fetch('/api/claude-md', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: activeProject || null, content }),
+  });
+  showFeedback('claudemd-feedback', 'Saved');
+});
+
+async function loadMemory() {
+  return fetch('/api/memory').then(r => r.json());
+}
+
+// ── Terminal send ─────────────────────────────────────────────────────────────
+
+async function sendToTerminal(text, termNum = 1) {
+  try {
+    const res = await fetch('/api/terminal/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ termNum, text }),
+    });
+    if (!res.ok) throw new Error(res.status);
+  } catch (e) {
+    alert(`Could not reach terminal: ${e.message}`);
+  }
+}
+
+// ── cd to project ─────────────────────────────────────────────────────────────
+
+document.getElementById('cd-btn').addEventListener('click', () => {
+  if (!activeProject) return;
+  sendToTerminal(`cd ${activeProject}\r`, 2);
+});
+
+// ── Brief + Recap ─────────────────────────────────────────────────────────────
+
+document.getElementById('brief-btn').addEventListener('click', async () => {
+  const todos = await fetch('/api/todos').then(r => r.json());
+  const { entries } = await fetch('/api/memory').then(r => r.json());
+
+  const open = todos.filter(t => !t.done);
+  const todoBlock = open.length
+    ? open.map(t => `- ${t.text}`).join('\n')
+    : '(none)';
+  const memBlock = entries.slice(0, 5).map(e => `- ${e.description}`).join('\n') || '(none)';
+  const project = activeProject ? activeProject.split('/').pop() : 'unknown';
+
+  const prompt = `Project: ${project}\n\nOpen tasks:\n${todoBlock}\n\nRecent memory:\n${memBlock}\n\nGot it — what are we working on today?\r`;
+  sendToTerminal(prompt);
+});
+
+// ── Recap capture flow ────────────────────────────────────────────────────────
+
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
+            .replace(/\x1b\][^\x07]*\x07/g, '')
+            .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '');
+}
+
+document.getElementById('recap-btn').addEventListener('click', async () => {
+  // Mark buffer position, then send /wrap to Claude
+  await fetch('/api/terminal/mark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ termNum: 1 }),
+  });
+  sendToTerminal('/wrap\r');
+
+  // Open modal
+  document.getElementById('recap-modal').classList.add('open');
+  document.getElementById('recap-status').textContent = 'Sent /wrap to Claude — hit "Capture from Terminal" when it finishes.';
+  document.getElementById('recap-text').value = '';
+});
+
+document.getElementById('recap-capture-btn').addEventListener('click', async () => {
+  const res = await fetch('/api/terminal/capture?termNum=1').then(r => r.json());
+  const clean = stripAnsi(res.content).trim();
+  document.getElementById('recap-text').value = clean;
+  document.getElementById('recap-status').textContent = 'Edit if needed, then Save to Memory.';
+});
+
+document.getElementById('recap-save-btn').addEventListener('click', async () => {
+  const content = document.getElementById('recap-text').value.trim();
+  if (!content) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  await fetch('/api/memory', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      content,
+      description: `Session recap ${today}`,
+      type: 'project',
+    }),
+  });
+
+  document.getElementById('recap-modal').classList.remove('open');
+  document.getElementById('recap-status').textContent = 'Waiting for Claude to finish...';
+  document.getElementById('recap-text').value = '';
+  loadMemory();
+});
+
+document.getElementById('recap-modal-close').addEventListener('click', () => {
+  document.getElementById('recap-modal').classList.remove('open');
+});
+
+// Close on backdrop click
+document.getElementById('recap-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('recap-modal'))
+    document.getElementById('recap-modal').classList.remove('open');
+});
+
+// ── To-Do ─────────────────────────────────────────────────────────────────────
+
+async function loadTodos() {
+  const todos = await fetch('/api/todos').then(r => r.json());
+  const list = document.getElementById('todo-list');
+  list.innerHTML = '';
+
+  const open = todos.filter(t => !t.done);
+  const done = todos.filter(t => t.done);
+  const ordered = [...open, ...done];
+
+  if (!ordered.length) {
+    list.innerHTML = '<div id="todo-empty">No tasks</div>';
+    return;
+  }
+
+  ordered.forEach(todo => {
+    const div = document.createElement('div');
+    div.className = 'todo-item';
+    div.innerHTML = `
+      <div class="todo-check ${todo.done ? 'done' : ''}" data-id="${todo.id}">${todo.done ? '✓' : ''}</div>
+      <span class="todo-text ${todo.done ? 'done' : ''}">${todo.text}</span>
+      <button class="icon-btn delete-todo" data-id="${todo.id}">✕</button>
+    `;
+    div.querySelector('.todo-check').addEventListener('click', async () => {
+      await fetch(`/api/todos/${todo.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ done: !todo.done }),
+      });
+      loadTodos();
+    });
+    div.querySelector('.delete-todo').addEventListener('click', async () => {
+      await fetch(`/api/todos/${todo.id}`, { method: 'DELETE' });
+      loadTodos();
+    });
+    list.appendChild(div);
+  });
+}
+
+async function addTodo() {
+  const input = document.getElementById('todo-input');
+  const text = input.value.trim();
+  if (!text) return;
+  await fetch('/api/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  input.value = '';
+  loadTodos();
+}
+
+document.getElementById('todo-add-btn').addEventListener('click', addTodo);
+document.getElementById('todo-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addTodo();
+});
+
+document.getElementById('todo-send-btn').addEventListener('click', async () => {
+  const todos = await fetch('/api/todos').then(r => r.json());
+  const open = todos.filter(t => !t.done);
+  if (!open.length) { showFeedback('todo-feedback', 'No open tasks'); return; }
+  const list = open.map(t => `- [ ] ${t.text}`).join('\n');
+  sendToTerminal(`Here are my current tasks — help me work through them:\n\n${list}\r`);
+  showFeedback('todo-feedback', 'Sent to Claude');
+});
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (!e.metaKey && !e.ctrlKey) return;
+  switch (e.key) {
+    case '1':
+      e.preventDefault();
+      t1.term.focus();
+      break;
+    case '2':
+      e.preventDefault();
+      t2.term.focus();
+      break;
+    case 't':
+    case 'T':
+      e.preventDefault();
+      document.getElementById('todo-input').focus();
+      // Expand todo panel if collapsed
+      const todoBody = document.getElementById('todo-body');
+      if (todoBody.classList.contains('collapsed')) todoBody.classList.remove('collapsed');
+      break;
+    case 'b':
+    case 'B':
+      e.preventDefault();
+      document.getElementById('brief-btn').click();
+      break;
+    case 'r':
+    case 'R':
+      e.preventDefault();
+      document.getElementById('recap-btn').click();
+      break;
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+loadConfig();
+loadClaudeMd('');
+loadMemory();
+loadTodos();
+</script>
+</body>
+</html>
