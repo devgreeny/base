@@ -253,7 +253,7 @@ function spawnSession(termNum) {
     cols: sess.cols,
     rows: sess.rows,
     cwd,
-    env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+    env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', PATH: `${process.env.PATH}:${os.homedir()}/.local/bin` },
   });
 
   try {
