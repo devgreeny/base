@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -225,33 +226,6 @@
   }
   .feedback-line.visible { opacity: 1; }
 
-  /* ── Git Panel ───────────────────────────────── */
-  #git-branch-line {
-    font-size: 10px;
-    color: var(--accent);
-    margin-bottom: 6px;
-    letter-spacing: 0.04em;
-  }
-
-  .git-output {
-    font-size: 10px;
-    color: var(--text-dim);
-    white-space: pre-wrap;
-    word-break: break-all;
-    line-height: 1.6;
-    max-height: 120px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-  }
-
-  #git-status-output { color: var(--text); margin-top: 6px; }
-
-  #git-error {
-    font-size: 10px;
-    color: var(--red);
-    display: none;
-  }
-
   /* ── CLAUDE.md Panel ─────────────────────────── */
   .claudemd-path {
     font-size: 9px;
@@ -274,50 +248,6 @@
     border-top: 1px solid var(--border);
   }
 
-  /* ── Skills Panel ────────────────────────────── */
-  .skill-item {
-    border-bottom: 1px solid var(--border);
-  }
-  .skill-item:last-child { border-bottom: none; }
-
-  .skill-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 0;
-  }
-
-  .skill-check {
-    width: 13px; height: 13px;
-    border: 1px solid var(--border);
-    background: var(--bg1);
-    cursor: pointer;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    color: var(--accent);
-  }
-  .skill-check.active { background: var(--accent-dim); border-color: var(--accent); }
-
-  .skill-name {
-    flex: 1;
-    font-size: 10px;
-    color: var(--text);
-    cursor: pointer;
-  }
-  .skill-name:hover { color: var(--accent); }
-
-  .skill-editor { display: none; padding-bottom: 6px; }
-  .skill-editor.open { display: block; }
-
-  #skills-empty {
-    font-size: 10px;
-    color: var(--text-faint);
-    font-style: italic;
-    padding: 4px 0 6px;
-  }
 
   /* ── Memory Panel ────────────────────────────── */
   #memory-list {
@@ -459,126 +389,18 @@
   }
   .header-action:hover { border-color: var(--accent); color: var(--text); }
   .header-action.active { border-color: var(--amber); color: var(--amber); }
+  .header-action:disabled { opacity: 0.6; cursor: wait; }
+  .btn:disabled { opacity: 0.6; cursor: wait; }
 
-  /* ── Recap modal ─────────────────────────────── */
-  #recap-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-  #recap-modal.open { display: flex; }
-
-  #recap-modal-inner {
-    background: var(--bg1);
-    border: 1px solid var(--border);
-    width: 560px;
-    max-width: 90vw;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  #recap-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border);
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
-
-  #recap-modal-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 14px;
-  }
-
-  #recap-text {
-    width: 100%;
-    min-height: 200px;
-    max-height: 400px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
+  #idle-timer {
     font-family: var(--font-mono);
-    font-size: 11px;
-    padding: 10px;
-    resize: vertical;
-    outline: none;
-    line-height: 1.6;
-  }
-
-  #recap-modal-footer {
-    display: flex;
-    gap: 8px;
-    padding: 10px 14px;
-    border-top: 1px solid var(--border);
-  }
-
-  /* ── Git cd button ───────────────────────────── */
-  #git-select-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-  #git-select-row select { margin-bottom: 0; flex: 1; }
-  #cd-btn { flex: 0; padding: 5px 8px; white-space: nowrap; }
-
-  /* ── To-Do Panel ─────────────────────────────── */
-  .todo-item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 5px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .todo-item:last-child { border-bottom: none; }
-
-  .todo-check {
-    width: 13px;
-    height: 13px;
-    border: 1px solid var(--border);
-    background: var(--bg1);
-    cursor: pointer;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    color: var(--accent);
-  }
-  .todo-check.done { background: var(--accent-dim); border-color: var(--accent); }
-
-  .todo-text {
-    flex: 1;
-    font-size: 10px;
-    color: var(--text);
-    line-height: 1.5;
-    word-break: break-word;
-  }
-  .todo-text.done { color: var(--text-faint); text-decoration: line-through; }
-
-  #todo-empty {
     font-size: 10px;
     color: var(--text-faint);
-    font-style: italic;
-    padding: 4px 0 8px;
+    letter-spacing: 0.06em;
+    text-transform: none;
   }
-
-  #todo-add-row {
-    display: flex;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  #todo-input { flex: 1; min-width: 0; }
+  #idle-timer.warn { color: var(--amber); }
+  #idle-timer.crit { color: var(--red); }
 
   /* ── Terminals ───────────────────────────────── */
   #terminals {
@@ -640,6 +462,436 @@
   }
 
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ── Tabs ────────────────────────────────────── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  #tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg1);
+    flex-shrink: 0;
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .tab-btn:hover { color: var(--text); background: var(--bg2); }
+  .tab-btn.active { color: var(--text); background: var(--bg); }
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .tab-pane {
+    flex: 1;
+    display: none;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .tab-pane.active { display: flex; flex-direction: column; animation: fadeIn 0.2s ease; }
+
+  /* ── Shared Terminal 1 slot (used by To Do / Notes / Help) ────────────── */
+  .tab-with-term {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .shared-term-slot {
+    flex: 1 1 0;
+    min-height: 60px;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .term1-slot { height: 100%; padding: 4px; }
+
+  .term-divider {
+    flex: 0 0 6px;
+    background: var(--bg1);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: ns-resize;
+    position: relative;
+    transition: background 0.15s;
+  }
+  .term-divider:hover, .term-divider.dragging { background: var(--accent-dim); }
+  .term-divider::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 40px;
+    height: 2px;
+    background: var(--text-faint);
+    transform: translate(-50%, -50%);
+    border-radius: 1px;
+    opacity: 0.5;
+  }
+
+  /* In each non-home tab, the second non-divider child fills remaining space */
+  .tab-with-term > *:not(.shared-term-slot):not(.term-divider) {
+    flex: 1 1 0;
+    display: flex;
+    overflow: hidden;
+    min-height: 60px;
+  }
+  #tab-todo .tab-with-term > #cluster-viz-wrap { flex: 1 1 0; min-height: 60px; }
+
+  .dump-section-header {
+    height: var(--term-header-h);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--bg1);
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  /* ── Cluster viz ─────────────────────────────── */
+  #cluster-viz-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  #cluster-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    user-select: none;
+  }
+  #cluster-svg.dragging { cursor: grabbing; }
+  #cluster-svg .cluster-dot { cursor: pointer; }
+
+  #cluster-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 5;
+  }
+  .cluster-ctrl {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .cluster-ctrl:hover { border-color: var(--accent); color: var(--text); }
+
+  #cluster-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-style: italic;
+    pointer-events: none;
+  }
+
+  #cluster-tooltip {
+    position: absolute;
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--theme-color, var(--accent));
+    color: var(--text);
+    font-size: 11px;
+    padding: 6px 10px;
+    pointer-events: none;
+    max-width: 280px;
+    line-height: 1.4;
+    display: none;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  #cluster-tooltip .tip-theme {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--theme-color, var(--accent));
+    margin-bottom: 3px;
+  }
+  #cluster-tooltip.done .tip-text { color: var(--text-faint); text-decoration: line-through; }
+
+  .cluster-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    fill: var(--text-dim);
+    text-anchor: middle;
+    letter-spacing: 0.04em;
+  }
+  .cluster-count {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--text-faint);
+    text-anchor: middle;
+    letter-spacing: 0.08em;
+  }
+  .cluster-dot { cursor: pointer; transition: r 0.15s; }
+  .cluster-dot:hover { stroke: var(--text); stroke-width: 2; }
+  .cluster-dot.done { opacity: 0.3; }
+  .cluster-edge { fill: none; stroke-width: 1.5; opacity: 0.45; pointer-events: none; }
+
+  /* ── Notes tab ───────────────────────────────── */
+  #notes-layout {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+  #notes-cluster-pane {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    min-width: 0;
+  }
+  #notes-cluster-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    user-select: none;
+  }
+  #notes-cluster-svg.dragging { cursor: grabbing; }
+  #notes-cluster-svg .cluster-dot { cursor: pointer; }
+  #notes-cluster-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 5;
+  }
+  #notes-cluster-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-style: italic;
+    pointer-events: none;
+    text-align: center;
+    padding: 0 20px;
+  }
+  #notes-cluster-tooltip {
+    position: absolute;
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--theme-color, var(--accent));
+    color: var(--text);
+    font-size: 11px;
+    padding: 8px 12px;
+    pointer-events: none;
+    max-width: 320px;
+    line-height: 1.5;
+    display: none;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  #notes-cluster-tooltip .tip-theme {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--theme-color, var(--accent));
+    margin-bottom: 4px;
+  }
+  #notes-cluster-tooltip .tip-name {
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 4px;
+    word-break: break-all;
+  }
+  #notes-cluster-tooltip .tip-preview {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  #notes-content-pane {
+    width: 440px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 1px solid var(--border);
+    background: var(--bg1);
+  }
+  #notes-current-path { word-break: break-all; }
+  #notes-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 28px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    scrollbar-width: thin;
+  }
+  #notes-content h1, #notes-content h2, #notes-content h3 {
+    font-family: var(--font-display);
+    color: var(--text);
+    margin: 18px 0 10px;
+  }
+  #notes-content h1 { font-size: 20px; }
+  #notes-content h2 { font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  #notes-content h3 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  #notes-content p { margin: 8px 0; }
+  #notes-content ul, #notes-content ol { margin: 8px 0 8px 22px; }
+  #notes-content li { margin: 3px 0; }
+  #notes-content code {
+    background: var(--bg2);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 11px;
+    color: var(--amber);
+  }
+  #notes-content pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 10px;
+    overflow-x: auto;
+    font-size: 11px;
+    margin: 10px 0;
+  }
+  #notes-content pre code { background: none; padding: 0; color: var(--text); }
+  #notes-content table { border-collapse: collapse; margin: 10px 0; font-size: 11px; }
+  #notes-content th, #notes-content td {
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    text-align: left;
+  }
+  #notes-content th { background: var(--bg2); color: var(--text-dim); }
+  #notes-content a { color: var(--accent); }
+  #notes-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  #notes-content blockquote {
+    border-left: 3px solid var(--accent-dim);
+    padding-left: 12px;
+    color: var(--text-dim);
+    margin: 10px 0;
+  }
+  #notes-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: 11px;
+  }
+
+  .notes-group-header {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 10px 14px 6px;
+  }
+  .notes-item {
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-dim);
+    transition: background 0.15s, color 0.15s;
+  }
+  .notes-item:hover { background: var(--bg2); color: var(--text); }
+  .notes-item.active { background: var(--bg2); color: var(--text); border-left: 2px solid var(--accent); padding-left: 12px; }
+  .notes-item-name { display: block; word-break: break-all; }
+  .notes-item-meta { font-size: 9px; color: var(--text-faint); margin-top: 2px; }
+
+  /* ── Slash Commands panel ────────────────────── */
+  .command-item {
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+  }
+  .command-item:last-child { border-bottom: none; }
+
+  .command-name {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+    word-break: break-all;
+  }
+  .command-desc {
+    font-size: 10px;
+    color: var(--text);
+    margin-bottom: 3px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .command-args {
+    font-size: 9px;
+    color: var(--text-faint);
+    font-style: italic;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .command-body-toggle {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+  }
+  .command-body-toggle:hover { color: var(--text); }
+  .command-body {
+    display: none;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    line-height: 1.5;
+    word-break: break-word;
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .command-body.open { display: block; }
+
 </style>
 </head>
 <body>
@@ -647,8 +899,6 @@
 <div id="header">
   <span id="app-name">Base</span>
   <div id="header-right">
-    <button class="header-action" id="brief-btn" title="Send current todos + memory to Claude (Cmd+B)">Brief</button>
-    <button class="header-action" id="recap-btn" title="Ask Claude to summarize this session (Cmd+R)">Recap</button>
     <div class="term-indicator">
       <div class="dot" id="dot1"></div>
       <span>Claude</span>
@@ -664,88 +914,42 @@
 
   <div id="sidebar">
 
-    <!-- Git Status -->
-    <div class="panel" id="git-panel">
-      <div class="panel-header" data-panel="git-body">
-        <span class="panel-title">Git Status</span>
-        <span>▾</span>
+    <!-- Memory panel: countdown + save button -->
+    <div class="panel" id="memory-panel">
+      <div class="panel-header" style="cursor:default">
+        <span class="panel-title">Memory</span>
+        <span id="idle-timer" title="Auto-save countdown — fires at 0:00">60:00</span>
       </div>
-      <div class="panel-body" id="git-body">
-        <div id="git-select-row">
-          <select id="project-select">
-            <option value="">— select project —</option>
-          </select>
-          <button class="btn" id="cd-btn" title="cd into project in Terminal 2">cd</button>
-        </div>
-        <div id="git-error"></div>
-        <div id="git-branch-line"></div>
-        <pre class="git-output" id="git-log-output"></pre>
-        <pre class="git-output" id="git-status-output"></pre>
+      <div class="panel-body">
+        <button class="btn btn-accent" id="save-memory-btn" style="width:100%">Save Memory Now</button>
+        <div class="feedback-line" id="save-memory-feedback"></div>
       </div>
     </div>
 
-    <!-- CLAUDE.md -->
+    <!-- CLAUDE.md (global only) -->
     <div class="panel" id="claudemd-panel">
       <div class="panel-header" data-panel="claudemd-body">
         <span class="panel-title">CLAUDE.md</span>
         <span>▾</span>
       </div>
       <div class="panel-body collapsed" id="claudemd-body">
-        <div class="sub-label">Global</div>
         <div class="claudemd-path" id="global-claudemd-path"></div>
         <textarea id="global-claudemd-input" style="min-height:120px;max-height:280px"></textarea>
         <div class="btn-row">
           <button class="btn btn-accent" id="save-global-claudemd-btn">Save</button>
         </div>
         <div class="feedback-line" id="global-claudemd-feedback"></div>
-
-        <div class="sub-section" id="project-claudemd-section" style="display:none">
-          <div class="sub-label">Project</div>
-          <div class="claudemd-path" id="project-claudemd-path"></div>
-          <textarea id="project-claudemd-input" style="min-height:100px;max-height:240px"></textarea>
-          <div class="btn-row">
-            <button class="btn btn-accent" id="save-project-claudemd-btn">Save</button>
-          </div>
-          <div class="feedback-line" id="project-claudemd-feedback"></div>
-        </div>
       </div>
     </div>
 
-    <!-- Skills -->
-    <div class="panel" id="skills-panel">
-      <div class="panel-header" data-panel="skills-body">
-        <span class="panel-title">Skills</span>
+    <!-- Slash Commands -->
+    <div class="panel" id="commands-panel">
+      <div class="panel-header" data-panel="commands-body">
+        <span class="panel-title">Slash Commands</span>
         <span>▸</span>
       </div>
-      <div class="panel-body collapsed" id="skills-body">
-        <div id="skills-list"></div>
-        <div class="btn-row" style="margin-top:6px">
-          <button class="btn btn-accent" id="send-skills-btn">Send Active to Claude</button>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input type="text" id="new-skill-input" placeholder="skill-name" style="flex:1">
-          <button class="btn" id="new-skill-btn" style="flex:0;padding:5px 10px;white-space:nowrap">+ New</button>
-        </div>
-        <div class="feedback-line" id="skills-feedback"></div>
-      </div>
-    </div>
-
-    <!-- To-Do -->
-    <div class="panel" id="todo-panel">
-      <div class="panel-header" data-panel="todo-body">
-        <span class="panel-title">To-Do</span>
-        <span>▾</span>
-      </div>
-      <div class="panel-body" id="todo-body">
-        <div id="todo-list"></div>
-        <div id="todo-add-row">
-          <input type="text" id="todo-input" placeholder="Add a task... (Cmd+T)">
-          <button class="btn btn-accent" id="todo-add-btn" style="flex:0;padding:5px 10px">Add</button>
-        </div>
-        <div class="btn-row" style="margin-top:6px">
-          <button class="btn" id="todo-send-btn">Send to Claude</button>
-        </div>
-        <div class="feedback-line" id="todo-feedback"></div>
+      <div class="panel-body collapsed" id="commands-body">
+        <div id="commands-list"></div>
       </div>
     </div>
 
@@ -773,42 +977,79 @@
 
   </div><!-- /sidebar -->
 
-  <div id="terminals">
-    <div class="terminal-pane" id="pane1">
-      <div class="terminal-header">
-        <div class="term-dot" id="tdot1"></div>
-        Terminal 1 — Claude Code
-      </div>
-      <div class="terminal-container" id="term1-container"></div>
+  <div id="main">
+
+    <div id="tabs">
+      <button class="tab-btn active" data-tab="home">Home</button>
+      <button class="tab-btn" data-tab="todo">To Do</button>
+      <button class="tab-btn" data-tab="notes">Notes</button>
     </div>
-    <div class="terminal-pane" id="pane2">
-      <div class="terminal-header">
-        <div class="term-dot" id="tdot2"></div>
-        Terminal 2 — Bash
+
+    <!-- Home tab -->
+    <div class="tab-pane active" id="tab-home">
+      <div id="terminals">
+        <div class="terminal-pane" id="pane1">
+          <div class="terminal-header">
+            <div class="term-dot" id="tdot1"></div>
+            Terminal 1 — Claude Code
+          </div>
+          <div class="terminal-container" id="term1-container"></div>
+        </div>
+        <div class="terminal-pane" id="pane2">
+          <div class="terminal-header">
+            <div class="term-dot" id="tdot2"></div>
+            Terminal 2 — Bash
+          </div>
+          <div class="terminal-container" id="term2-container"></div>
+        </div>
       </div>
-      <div class="terminal-container" id="term2-container"></div>
     </div>
+
+    <!-- To Do tab -->
+    <div class="tab-pane" id="tab-todo">
+      <div class="tab-with-term">
+        <div class="shared-term-slot"><div class="terminal-container term1-slot" id="term1-slot-todo"></div></div>
+        <div class="term-divider"></div>
+        <div id="cluster-viz-wrap">
+          <svg id="cluster-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="cluster-controls">
+            <button class="cluster-ctrl" id="cluster-zoom-in" title="Zoom in">+</button>
+            <button class="cluster-ctrl" id="cluster-zoom-out" title="Zoom out">−</button>
+            <button class="cluster-ctrl" id="cluster-reset" title="Reset view">⊙</button>
+          </div>
+          <div id="cluster-tooltip"></div>
+          <div id="cluster-empty">No todos yet — type /todo in Terminal 1 to dump and cluster.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes tab -->
+    <div class="tab-pane" id="tab-notes">
+      <div class="tab-with-term">
+        <div class="shared-term-slot"><div class="terminal-container term1-slot" id="term1-slot-notes"></div></div>
+        <div class="term-divider"></div>
+        <div id="notes-layout">
+          <div id="notes-cluster-pane">
+            <svg id="notes-cluster-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="notes-cluster-controls">
+              <button class="cluster-ctrl" id="notes-zoom-in" title="Zoom in">+</button>
+              <button class="cluster-ctrl" id="notes-zoom-out" title="Zoom out">−</button>
+              <button class="cluster-ctrl" id="notes-reset" title="Reset view">⊙</button>
+            </div>
+            <div id="notes-cluster-tooltip"></div>
+            <div id="notes-cluster-empty">No notes yet. Create .md files in ~/notes/ or write memories.</div>
+          </div>
+          <div id="notes-content-pane">
+            <div class="dump-section-header" id="notes-current-path">Click a note to view</div>
+            <div id="notes-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 </div><!-- /content -->
-
-<!-- Recap capture modal -->
-<div id="recap-modal">
-  <div id="recap-modal-inner">
-    <div id="recap-modal-header">
-      <span>Session Recap</span>
-      <button class="icon-btn" id="recap-modal-close">✕</button>
-    </div>
-    <div id="recap-modal-body">
-      <div id="recap-status" style="font-size:10px;color:var(--text-faint);margin-bottom:10px;">Waiting for Claude to finish...</div>
-      <textarea id="recap-text" placeholder="Claude's summary will appear here. You can edit before saving."></textarea>
-    </div>
-    <div id="recap-modal-footer">
-      <button class="btn" id="recap-capture-btn">Capture from Terminal</button>
-      <button class="btn btn-accent" id="recap-save-btn">Save to Memory</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ── Utilities ────────────────────────────────────────────────────────────────
@@ -912,28 +1153,10 @@ const t2 = spawnTerminal('term2-container', '/terminal/2', 'dot2', 'tdot2');
 // ── Config + Settings ─────────────────────────────────────────────────────────
 
 let config = {};
-let activeProject = '';
 
 async function loadConfig() {
   const res = await fetch('/api/config');
   config = await res.json();
-
-  // Git project selector
-  const sel = document.getElementById('project-select');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">— select project —</option>';
-  (config.projects || []).forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p; opt.textContent = p.split('/').pop(); opt.title = p;
-    sel.appendChild(opt);
-  });
-  if (prev && config.projects?.includes(prev)) sel.value = prev;
-  else if (config.projects?.length === 1) {
-    sel.value = config.projects[0];
-    selectProject(config.projects[0]);
-  }
-
-  // Settings form
   renderProjectsList(config.projects || []);
   document.getElementById('port-input').value = config.port || 3000;
 }
@@ -982,53 +1205,12 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
   loadConfig();
 });
 
-// ── Git Status ────────────────────────────────────────────────────────────────
+// ── CLAUDE.md (global only) ───────────────────────────────────────────────────
 
-function selectProject(projectPath) {
-  activeProject = projectPath;
-  loadGitStatus(projectPath);
-  loadClaudeMd(projectPath);
-}
-
-async function loadGitStatus(projectPath) {
-  const errEl    = document.getElementById('git-error');
-  const branchEl = document.getElementById('git-branch-line');
-  const logEl    = document.getElementById('git-log-output');
-  const statusEl = document.getElementById('git-status-output');
-  errEl.style.display = 'none';
-  branchEl.textContent = logEl.textContent = statusEl.textContent = '';
-  if (!projectPath) return;
-  try {
-    const data = await fetch(`/api/git?project=${encodeURIComponent(projectPath)}`).then(r => r.json());
-    if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
-    branchEl.textContent = `⎇  ${data.branch}`;
-    logEl.textContent    = data.log;
-    statusEl.textContent = data.status || '(working tree clean)';
-  } catch (e) {
-    errEl.textContent = e.message; errEl.style.display = 'block';
-  }
-}
-
-document.getElementById('project-select').addEventListener('change', e => selectProject(e.target.value));
-
-// ── CLAUDE.md ─────────────────────────────────────────────────────────────────
-
-async function loadClaudeMd(projectPath) {
-  // Always load global
+async function loadClaudeMd() {
   const global = await fetch('/api/claude-md').then(r => r.json());
   document.getElementById('global-claudemd-input').value = global.content;
   document.getElementById('global-claudemd-path').textContent = global.path;
-
-  // Load project if selected
-  const section = document.getElementById('project-claudemd-section');
-  if (projectPath) {
-    const proj = await fetch(`/api/claude-md?project=${encodeURIComponent(projectPath)}`).then(r => r.json());
-    document.getElementById('project-claudemd-input').value = proj.content;
-    document.getElementById('project-claudemd-path').textContent = proj.path;
-    section.style.display = '';
-  } else {
-    section.style.display = 'none';
-  }
 }
 
 document.getElementById('save-global-claudemd-btn').addEventListener('click', async () => {
@@ -1041,111 +1223,6 @@ document.getElementById('save-global-claudemd-btn').addEventListener('click', as
   showFeedback('global-claudemd-feedback', 'Saved');
 });
 
-document.getElementById('save-project-claudemd-btn').addEventListener('click', async () => {
-  if (!activeProject) return;
-  const content = document.getElementById('project-claudemd-input').value;
-  await fetch('/api/claude-md', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project: activeProject, content }),
-  });
-  showFeedback('project-claudemd-feedback', 'Saved');
-});
-
-// ── Skills ────────────────────────────────────────────────────────────────────
-
-const activeSkills = new Set();
-
-async function loadSkills() {
-  const skills = await fetch('/api/skills').then(r => r.json());
-  const list = document.getElementById('skills-list');
-  list.innerHTML = '';
-
-  if (!skills.length) {
-    list.innerHTML = '<div id="skills-empty">No skills yet — create one below</div>';
-    return;
-  }
-
-  skills.forEach(({ name }) => {
-    const item = document.createElement('div');
-    item.className = 'skill-item';
-    item.innerHTML = `
-      <div class="skill-row">
-        <div class="skill-check ${activeSkills.has(name) ? 'active' : ''}" data-skill="${name}">${activeSkills.has(name) ? '✓' : ''}</div>
-        <span class="skill-name" data-skill="${name}">${name}</span>
-        <button class="icon-btn delete-skill" data-skill="${name}" title="Delete">✕</button>
-      </div>
-      <div class="skill-editor" id="editor-${name}">
-        <textarea style="min-height:80px;max-height:200px;margin-bottom:4px" id="skill-ta-${name}"></textarea>
-        <div class="btn-row">
-          <button class="btn btn-accent save-skill" data-skill="${name}">Save</button>
-        </div>
-      </div>
-    `;
-
-    item.querySelector('.skill-check').addEventListener('click', () => {
-      if (activeSkills.has(name)) activeSkills.delete(name);
-      else activeSkills.add(name);
-      loadSkills();
-    });
-
-    item.querySelector('.skill-name').addEventListener('click', async () => {
-      const editor = document.getElementById(`editor-${name}`);
-      const isOpen = editor.classList.toggle('open');
-      if (isOpen) {
-        const { content } = await fetch(`/api/skills/${encodeURIComponent(name)}`).then(r => r.json());
-        document.getElementById(`skill-ta-${name}`).value = content;
-      }
-    });
-
-    item.querySelector('.save-skill').addEventListener('click', async () => {
-      const content = document.getElementById(`skill-ta-${name}`).value;
-      await fetch(`/api/skills/${encodeURIComponent(name)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-      showFeedback('skills-feedback', 'Saved');
-    });
-
-    item.querySelector('.delete-skill').addEventListener('click', async () => {
-      if (!confirm(`Delete skill "${name}"?`)) return;
-      await fetch(`/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
-      activeSkills.delete(name);
-      loadSkills();
-    });
-
-    list.appendChild(item);
-  });
-}
-
-document.getElementById('new-skill-btn').addEventListener('click', async () => {
-  const input = document.getElementById('new-skill-input');
-  const name = input.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-  if (!name) return;
-  await fetch(`/api/skills/${encodeURIComponent(name)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: `# ${name}\n\n` }),
-  });
-  input.value = '';
-  loadSkills();
-});
-
-document.getElementById('new-skill-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('new-skill-btn').click();
-});
-
-document.getElementById('send-skills-btn').addEventListener('click', async () => {
-  if (!activeSkills.size) { showFeedback('skills-feedback', 'No skills active'); return; }
-  const contents = await Promise.all(
-    [...activeSkills].map(name =>
-      fetch(`/api/skills/${encodeURIComponent(name)}`).then(r => r.json()).then(d => `## Skill: ${name}\n\n${d.content}`)
-    )
-  );
-  sendToTerminal(`Here are my active skills for this session:\n\n${contents.join('\n\n---\n\n')}\r`);
-  showFeedback('skills-feedback', 'Sent to Claude');
-});
 
 async function loadMemory() {
   return fetch('/api/memory').then(r => r.json());
@@ -1166,31 +1243,20 @@ async function sendToTerminal(text, termNum = 1) {
   }
 }
 
-// ── cd to project ─────────────────────────────────────────────────────────────
+// ── Idle timer + Save Memory ──────────────────────────────────────────────────
 
-document.getElementById('cd-btn').addEventListener('click', () => {
-  if (!activeProject) return;
-  sendToTerminal(`cd ${activeProject}\r`, 2);
-});
+let lastInteractionTs = Date.now();
+const AUTO_SAVE_AFTER_MS = 60 * 60 * 1000; // 1h
+let savingMemory = false;
+let autoFiredForThisIdle = false;
 
-// ── Brief + Recap ─────────────────────────────────────────────────────────────
+function bumpInteraction() {
+  lastInteractionTs = Date.now();
+  autoFiredForThisIdle = false;
+}
 
-document.getElementById('brief-btn').addEventListener('click', async () => {
-  const todos = await fetch('/api/todos').then(r => r.json());
-  const { entries } = await fetch('/api/memory').then(r => r.json());
-
-  const open = todos.filter(t => !t.done);
-  const todoBlock = open.length
-    ? open.map(t => `- ${t.text}`).join('\n')
-    : '(none)';
-  const memBlock = entries.slice(0, 5).map(e => `- ${e.description}`).join('\n') || '(none)';
-  const project = activeProject ? activeProject.split('/').pop() : 'unknown';
-
-  const prompt = `Project: ${project}\n\nOpen tasks:\n${todoBlock}\n\nRecent memory:\n${memBlock}\n\nGot it — what are we working on today?\r`;
-  sendToTerminal(prompt);
-});
-
-// ── Recap capture flow ────────────────────────────────────────────────────────
+// Reset idle clock when user types into Terminal 1
+if (t1?.term) t1.term.onData(() => bumpInteraction());
 
 function stripAnsi(str) {
   return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
@@ -1198,125 +1264,717 @@ function stripAnsi(str) {
             .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '');
 }
 
-document.getElementById('recap-btn').addEventListener('click', async () => {
-  // Mark buffer position, then send /wrap to Claude
-  await fetch('/api/terminal/mark', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ termNum: 1 }),
+function fmtCountdown(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function tickIdleTimer() {
+  const elapsed = Date.now() - lastInteractionTs;
+  const remaining = AUTO_SAVE_AFTER_MS - elapsed;
+  const el = document.getElementById('idle-timer');
+  if (el) {
+    el.textContent = fmtCountdown(remaining);
+    // Warn when 30+ minutes have passed (i.e., < 30 min remaining); crit at < 5 min
+    el.classList.toggle('warn', remaining > 0 && remaining <= 30 * 60 * 1000 && remaining > 5 * 60 * 1000);
+    el.classList.toggle('crit', remaining <= 5 * 60 * 1000);
+  }
+  if (elapsed >= AUTO_SAVE_AFTER_MS && !autoFiredForThisIdle && !savingMemory) {
+    autoFiredForThisIdle = true;
+    saveMemoryFlow(true);
+  }
+}
+setInterval(tickIdleTimer, 1000);
+
+async function saveMemoryFlow(isAuto = false) {
+  if (savingMemory) return;
+  savingMemory = true;
+  const btn = document.getElementById('save-memory-btn');
+  if (btn) { btn.disabled = true; btn.textContent = isAuto ? 'Auto-saving…' : 'Saving…'; }
+
+  try {
+    // Mark Terminal 1 buffer position
+    await fetch('/api/terminal/mark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ termNum: 1 }),
+    });
+    // Send /wrap to Claude
+    await sendToTerminal('/wrap\r');
+    // Wait for response (45s, same as server-side heartbeat)
+    await new Promise(r => setTimeout(r, 45000));
+    // Capture
+    const cap = await fetch('/api/terminal/capture?termNum=1').then(r => r.json());
+    const content = stripAnsi(cap.content || '').trim();
+    if (content) {
+      const today = new Date().toISOString().slice(0, 10);
+      await fetch('/api/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content,
+          description: `Session memory ${today}${isAuto ? ' (auto)' : ''}`,
+          type: 'project',
+        }),
+      });
+    }
+    bumpInteraction();
+    if (btn) btn.textContent = 'Saved ✓';
+    setTimeout(() => { if (btn) btn.textContent = 'Save Memory Now'; }, 2500);
+  } catch (e) {
+    if (btn) btn.textContent = 'Failed';
+    setTimeout(() => { if (btn) btn.textContent = 'Save Memory Now'; }, 2500);
+  } finally {
+    savingMemory = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.getElementById('save-memory-btn')?.addEventListener('click', () => saveMemoryFlow(false));
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+let activeTab = 'home';
+let todoPollInterval = null;
+let lastTodoSig = '';
+
+const TERM1_SLOTS = {
+  home: 'term1-container',
+  todo: 'term1-slot-todo',
+  notes: 'term1-slot-notes',
+};
+
+function moveTerm1To(slotId) {
+  const slot = document.getElementById(slotId);
+  const el = t1?.term?.element;
+  if (!slot || !el) return;
+  if (el.parentElement !== slot) slot.appendChild(el);
+  setTimeout(() => { try { t1.fitAddon.fit(); } catch {} }, 50);
+}
+
+// Persistent draggable divider between Terminal 1 and the tab content below
+function getTermSlotRatio() {
+  const r = parseFloat(localStorage.getItem('baseTermSlotRatio'));
+  return Number.isFinite(r) && r > 0.05 && r < 0.95 ? r : 0.5;
+}
+
+function applyTermSlotRatio(ratio) {
+  document.querySelectorAll('.tab-with-term').forEach(container => {
+    const slot = container.querySelector('.shared-term-slot');
+    const divider = container.querySelector('.term-divider');
+    if (!slot || !divider) return;
+    const content = divider.nextElementSibling;
+    slot.style.flexGrow = ratio;
+    if (content) content.style.flexGrow = 1 - ratio;
   });
-  sendToTerminal('/wrap\r');
+}
 
-  // Open modal
-  document.getElementById('recap-modal').classList.add('open');
-  document.getElementById('recap-status').textContent = 'Sent /wrap to Claude — hit "Capture from Terminal" when it finishes.';
-  document.getElementById('recap-text').value = '';
+function setupTermDividers() {
+  document.querySelectorAll('.term-divider').forEach(divider => {
+    divider.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const container = divider.parentElement;
+      divider.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'ns-resize';
+
+      function onMove(ev) {
+        const rect = container.getBoundingClientRect();
+        const offsetTop = ev.clientY - rect.top;
+        const total = rect.height;
+        const ratio = Math.max(0.1, Math.min(0.9, offsetTop / total));
+        applyTermSlotRatio(ratio);
+        localStorage.setItem('baseTermSlotRatio', ratio);
+        try { t1.fitAddon.fit(); } catch {}
+      }
+      function onUp() {
+        divider.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        try { t1.fitAddon.fit(); } catch {}
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
+applyTermSlotRatio(getTermSlotRatio());
+setupTermDividers();
+
+function setActiveTab(name) {
+  activeTab = name;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+
+  moveTerm1To(TERM1_SLOTS[name] || TERM1_SLOTS.home);
+
+  // Refresh todo polling — only run while on the To Do tab
+  if (todoPollInterval) { clearInterval(todoPollInterval); todoPollInterval = null; }
+
+  if (name === 'todo') {
+    renderClusteredTodos();
+    lastTodoSig = '';
+    todoPollInterval = setInterval(async () => {
+      try {
+        const todos = await fetch('/api/todos').then(r => r.json());
+        const sig = JSON.stringify(todos.map(t => [t.id, t.done, t.theme]));
+        if (sig !== lastTodoSig) { lastTodoSig = sig; renderClusteredTodos(); }
+      } catch {}
+    }, 3000);
+  } else if (name === 'notes') {
+    renderNotesCluster();
+  } else if (name === 'home') {
+    setTimeout(() => { try { t1.fitAddon.fit(); t2.fitAddon.fit(); } catch {} }, 50);
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
 });
 
-document.getElementById('recap-capture-btn').addEventListener('click', async () => {
-  const res = await fetch('/api/terminal/capture?termNum=1').then(r => r.json());
-  const clean = stripAnsi(res.content).trim();
-  document.getElementById('recap-text').value = clean;
-  document.getElementById('recap-status').textContent = 'Edit if needed, then Save to Memory.';
-});
+const THEME_COLORS = ['#3d6b4f', '#c4a261', '#5a7fa8', '#7a5a8a', '#4a8a8a', '#cc5555', '#8aa05a', '#a86d4a'];
 
-document.getElementById('recap-save-btn').addEventListener('click', async () => {
-  const content = document.getElementById('recap-text').value.trim();
-  if (!content) return;
+function themeColor(name) {
+  if (!name || name === 'Uncategorized') return null;
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
+  return THEME_COLORS[Math.abs(h) % THEME_COLORS.length];
+}
 
-  const today = new Date().toISOString().slice(0, 10);
-  await fetch('/api/memory', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      content,
-      description: `Session recap ${today}`,
-      type: 'project',
-    }),
+function seededRandom(seed) {
+  let s = (seed % 2147483647) || 1;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
+function computeCentroids(n, w, h) {
+  if (n === 0) return [];
+  if (n === 1) return [[w / 2, h / 2]];
+  const cx = w / 2, cy = h / 2;
+  const R = Math.min(w, h) * 0.32;
+  return Array.from({ length: n }, (_, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return [cx + R * Math.cos(angle), cy + R * Math.sin(angle)];
+  });
+}
+
+// ── Generic cluster viz ──────────────────────────────────────────────────────
+
+function renderClusterViz({ svg, viewportId, groups, colorFn, dotMeta, transform }) {
+  const NS = 'http://www.w3.org/2000/svg';
+  svg.innerHTML = '';
+
+  const themeNames = [...groups.keys()].sort((a, b) => {
+    if (a === 'Uncategorized') return 1;
+    if (b === 'Uncategorized') return -1;
+    return a.localeCompare(b);
   });
 
-  document.getElementById('recap-modal').classList.remove('open');
-  document.getElementById('recap-status').textContent = 'Waiting for Claude to finish...';
-  document.getElementById('recap-text').value = '';
-  loadMemory();
-});
+  const W = svg.parentElement.clientWidth || 800;
+  const H = svg.parentElement.clientHeight || 600;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
 
-document.getElementById('recap-modal-close').addEventListener('click', () => {
-  document.getElementById('recap-modal').classList.remove('open');
-});
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('id', viewportId);
+  svg.appendChild(g);
 
-// Close on backdrop click
-document.getElementById('recap-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('recap-modal'))
-    document.getElementById('recap-modal').classList.remove('open');
-});
+  const N = themeNames.length;
+  const centroids = computeCentroids(N, W, H);
 
-// ── To-Do ─────────────────────────────────────────────────────────────────────
+  themeNames.forEach((name, idx) => {
+    const items = groups.get(name);
+    const [cx, cy] = centroids[idx];
+    const color = colorFn(name);
+    const M = items.length;
+    const clusterR = Math.max(28, Math.sqrt(M) * 22);
 
-async function loadTodos() {
+    const positions = items.map((_, i) => {
+      if (M === 1) return [cx, cy];
+      const angle = (i / M) * 2 * Math.PI - Math.PI / 2;
+      return [cx + clusterR * Math.cos(angle), cy + clusterR * Math.sin(angle)];
+    });
+
+    if (M === 2) {
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', positions[0][0]);
+      line.setAttribute('y1', positions[0][1]);
+      line.setAttribute('x2', positions[1][0]);
+      line.setAttribute('y2', positions[1][1]);
+      line.setAttribute('stroke', color);
+      line.setAttribute('class', 'cluster-edge');
+      g.appendChild(line);
+    } else if (M >= 3) {
+      const poly = document.createElementNS(NS, 'polygon');
+      poly.setAttribute('points', positions.map(p => p.join(',')).join(' '));
+      poly.setAttribute('stroke', color);
+      poly.setAttribute('class', 'cluster-edge');
+      g.appendChild(poly);
+    }
+
+    items.forEach((it, i) => {
+      const [x, y] = positions[i];
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', x);
+      c.setAttribute('cy', y);
+      c.setAttribute('r', 6);
+      c.setAttribute('fill', color);
+      const meta = dotMeta(it, name);
+      const doneClass = meta.done ? ' done' : '';
+      c.setAttribute('class', 'cluster-dot' + doneClass);
+      for (const [k, v] of Object.entries(meta.data || {})) c.dataset[k] = v;
+      g.appendChild(c);
+    });
+
+    const label = document.createElementNS(NS, 'text');
+    label.setAttribute('x', cx);
+    label.setAttribute('y', cy + clusterR + 22);
+    label.setAttribute('class', 'cluster-label');
+    label.setAttribute('fill', color);
+    label.textContent = name;
+    g.appendChild(label);
+
+    const subText = dotMeta.subText ? dotMeta.subText(items) : `${items.length}`;
+    const count = document.createElementNS(NS, 'text');
+    count.setAttribute('x', cx);
+    count.setAttribute('y', cy + clusterR + 36);
+    count.setAttribute('class', 'cluster-count');
+    count.textContent = subText;
+    g.appendChild(count);
+  });
+
+  // Apply current transform
+  const vp = document.getElementById(viewportId);
+  if (vp) vp.setAttribute('transform', `translate(${transform.tx} ${transform.ty}) scale(${transform.scale})`);
+}
+
+function setupPanZoom(svgId, ctrlIds, transform, applyFn) {
+  const svg = document.getElementById(svgId);
+  if (!svg || svg.dataset.panZoomSetup) return;
+  svg.dataset.panZoomSetup = '1';
+
+  let dragging = false;
+  let dragStart = null;
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const oldScale = transform.scale;
+    const newScale = Math.max(0.2, Math.min(6, oldScale * factor));
+    const worldX = (mx - transform.tx) / oldScale;
+    const worldY = (my - transform.ty) / oldScale;
+    transform.scale = newScale;
+    transform.tx = mx - worldX * newScale;
+    transform.ty = my - worldY * newScale;
+    applyFn();
+  }, { passive: false });
+
+  svg.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (e.target.classList?.contains('cluster-dot')) return;
+    dragging = true;
+    dragStart = { x: e.clientX - transform.tx, y: e.clientY - transform.ty };
+    svg.classList.add('dragging');
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    transform.tx = e.clientX - dragStart.x;
+    transform.ty = e.clientY - dragStart.y;
+    applyFn();
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    svg.classList.remove('dragging');
+  });
+
+  const zoomBy = (factor) => {
+    const rect = svg.getBoundingClientRect();
+    const mx = rect.width / 2, my = rect.height / 2;
+    const oldScale = transform.scale;
+    const newScale = Math.max(0.2, Math.min(6, oldScale * factor));
+    const worldX = (mx - transform.tx) / oldScale;
+    const worldY = (my - transform.ty) / oldScale;
+    transform.scale = newScale;
+    transform.tx = mx - worldX * newScale;
+    transform.ty = my - worldY * newScale;
+    applyFn();
+  };
+
+  document.getElementById(ctrlIds.in)?.addEventListener('click', () => zoomBy(1.25));
+  document.getElementById(ctrlIds.out)?.addEventListener('click', () => zoomBy(1 / 1.25));
+  document.getElementById(ctrlIds.reset)?.addEventListener('click', () => {
+    transform.tx = 0; transform.ty = 0; transform.scale = 1;
+    applyFn();
+  });
+}
+
+let clusterTransform = { tx: 0, ty: 0, scale: 1 };
+
+function applyClusterTransform() {
+  const g = document.getElementById('cluster-viewport');
+  if (g) g.setAttribute('transform', `translate(${clusterTransform.tx} ${clusterTransform.ty}) scale(${clusterTransform.scale})`);
+}
+
+async function renderClusteredTodos() {
+  const wrap = document.getElementById('cluster-viz-wrap');
+  const svg = document.getElementById('cluster-svg');
+  const emptyEl = document.getElementById('cluster-empty');
   const todos = await fetch('/api/todos').then(r => r.json());
-  const list = document.getElementById('todo-list');
-  list.innerHTML = '';
 
-  const open = todos.filter(t => !t.done);
-  const done = todos.filter(t => t.done);
-  const ordered = [...open, ...done];
-
-  if (!ordered.length) {
-    list.innerHTML = '<div id="todo-empty">No tasks</div>';
+  svg.innerHTML = '';
+  if (!todos.length) {
+    emptyEl.style.display = 'flex';
     return;
   }
+  emptyEl.style.display = 'none';
 
-  ordered.forEach(todo => {
-    const div = document.createElement('div');
-    div.className = 'todo-item';
-    div.innerHTML = `
-      <div class="todo-check ${todo.done ? 'done' : ''}" data-id="${todo.id}">${todo.done ? '✓' : ''}</div>
-      <span class="todo-text ${todo.done ? 'done' : ''}">${todo.text}</span>
-      <button class="icon-btn delete-todo" data-id="${todo.id}">✕</button>
+  const groups = new Map();
+  for (const t of todos) {
+    const key = t.theme || 'Uncategorized';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+  const themeNames = [...groups.keys()].sort((a, b) => {
+    if (a === 'Uncategorized') return 1;
+    if (b === 'Uncategorized') return -1;
+    return a.localeCompare(b);
+  });
+
+  const W = wrap.clientWidth || 800;
+  const H = wrap.clientHeight || 600;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('id', 'cluster-viewport');
+  svg.appendChild(g);
+
+  const N = themeNames.length;
+  const centroids = computeCentroids(N, W, H);
+
+  themeNames.forEach((name, idx) => {
+    const items = groups.get(name);
+    const [cx, cy] = centroids[idx];
+    const color = themeColor(name) || '#888';
+    const M = items.length;
+    const clusterR = Math.max(28, Math.sqrt(M) * 22);
+
+    // Vertex positions: regular M-gon
+    const positions = items.map((_, i) => {
+      if (M === 1) return [cx, cy];
+      const angle = (i / M) * 2 * Math.PI - Math.PI / 2;
+      return [cx + clusterR * Math.cos(angle), cy + clusterR * Math.sin(angle)];
+    });
+
+    // Connecting shape (line for 2, polygon for 3+)
+    if (M === 2) {
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', positions[0][0]);
+      line.setAttribute('y1', positions[0][1]);
+      line.setAttribute('x2', positions[1][0]);
+      line.setAttribute('y2', positions[1][1]);
+      line.setAttribute('stroke', color);
+      line.setAttribute('class', 'cluster-edge');
+      g.appendChild(line);
+    } else if (M >= 3) {
+      const poly = document.createElementNS(NS, 'polygon');
+      poly.setAttribute('points', positions.map(p => p.join(',')).join(' '));
+      poly.setAttribute('stroke', color);
+      poly.setAttribute('class', 'cluster-edge');
+      g.appendChild(poly);
+    }
+
+    // Dots at vertices
+    items.forEach((t, i) => {
+      const [x, y] = positions[i];
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', x);
+      c.setAttribute('cy', y);
+      c.setAttribute('r', 6);
+      c.setAttribute('fill', color);
+      c.setAttribute('class', 'cluster-dot' + (t.done ? ' done' : ''));
+      c.dataset.id = t.id;
+      c.dataset.text = t.text;
+      c.dataset.theme = name;
+      c.dataset.done = t.done ? '1' : '0';
+      g.appendChild(c);
+    });
+
+    // Theme label
+    const label = document.createElementNS(NS, 'text');
+    label.setAttribute('x', cx);
+    label.setAttribute('y', cy + clusterR + 22);
+    label.setAttribute('class', 'cluster-label');
+    label.setAttribute('fill', color);
+    label.textContent = name;
+    g.appendChild(label);
+
+    const openCount = items.filter(t => !t.done).length;
+    const count = document.createElementNS(NS, 'text');
+    count.setAttribute('x', cx);
+    count.setAttribute('y', cy + clusterR + 36);
+    count.setAttribute('class', 'cluster-count');
+    count.textContent = `${openCount}/${items.length}`;
+    g.appendChild(count);
+  });
+
+  applyClusterTransform();
+  attachClusterTooltips();
+}
+
+// ── Cluster pan + zoom ───────────────────────────────────────────────────────
+
+(function setupClusterPanZoom() {
+  const svg = document.getElementById('cluster-svg');
+  if (!svg) return;
+
+  let dragging = false;
+  let dragStart = null;
+  let movedDuringDrag = false;
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const oldScale = clusterTransform.scale;
+    const newScale = Math.max(0.2, Math.min(6, oldScale * factor));
+    const worldX = (mx - clusterTransform.tx) / oldScale;
+    const worldY = (my - clusterTransform.ty) / oldScale;
+    clusterTransform.scale = newScale;
+    clusterTransform.tx = mx - worldX * newScale;
+    clusterTransform.ty = my - worldY * newScale;
+    applyClusterTransform();
+  }, { passive: false });
+
+  svg.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (e.target.classList?.contains('cluster-dot')) return; // let dot hover work
+    dragging = true;
+    movedDuringDrag = false;
+    dragStart = { x: e.clientX - clusterTransform.tx, y: e.clientY - clusterTransform.ty };
+    svg.classList.add('dragging');
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    movedDuringDrag = true;
+    clusterTransform.tx = e.clientX - dragStart.x;
+    clusterTransform.ty = e.clientY - dragStart.y;
+    applyClusterTransform();
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    svg.classList.remove('dragging');
+  });
+
+  document.getElementById('cluster-zoom-in')?.addEventListener('click', () => zoomBy(1.25));
+  document.getElementById('cluster-zoom-out')?.addEventListener('click', () => zoomBy(1 / 1.25));
+  document.getElementById('cluster-reset')?.addEventListener('click', () => {
+    clusterTransform = { tx: 0, ty: 0, scale: 1 };
+    applyClusterTransform();
+  });
+
+  function zoomBy(factor) {
+    const rect = svg.getBoundingClientRect();
+    const mx = rect.width / 2, my = rect.height / 2;
+    const oldScale = clusterTransform.scale;
+    const newScale = Math.max(0.2, Math.min(6, oldScale * factor));
+    const worldX = (mx - clusterTransform.tx) / oldScale;
+    const worldY = (my - clusterTransform.ty) / oldScale;
+    clusterTransform.scale = newScale;
+    clusterTransform.tx = mx - worldX * newScale;
+    clusterTransform.ty = my - worldY * newScale;
+    applyClusterTransform();
+  }
+})();
+
+function attachClusterTooltips() {
+  const svg = document.getElementById('cluster-svg');
+  const tip = document.getElementById('cluster-tooltip');
+  const wrap = document.getElementById('cluster-viz-wrap');
+
+  svg.querySelectorAll('.cluster-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', () => {
+      const text = dot.dataset.text;
+      const theme = dot.dataset.theme;
+      const done = dot.dataset.done === '1';
+      tip.style.setProperty('--theme-color', themeColor(theme) || 'var(--accent)');
+      tip.classList.toggle('done', done);
+      tip.innerHTML = `<div class="tip-theme">${escapeHtml(theme)}</div><div class="tip-text">${escapeHtml(text)}</div>`;
+      tip.style.display = 'block';
+
+      // Use the dot's actual on-screen bounding box so any pan/zoom is reflected
+      const dotRect = dot.getBoundingClientRect();
+      const wrapRect = wrap.getBoundingClientRect();
+      const cx = dotRect.left + dotRect.width / 2 - wrapRect.left;
+      const cy = dotRect.top + dotRect.height / 2 - wrapRect.top;
+      const tipW = 280;
+      const flipX = cx + 14 + tipW > wrap.clientWidth ? cx - 14 - tipW : cx + 14;
+      tip.style.left = Math.max(4, flipX) + 'px';
+      tip.style.top = Math.max(4, cy + 14) + 'px';
+    });
+    dot.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+}
+
+window.addEventListener('resize', () => { if (activeTab === 'todo') renderClusteredTodos(); });
+
+function refreshAllTodos() {
+  if (activeTab === 'todo') renderClusteredTodos();
+}
+
+// ── Notes tab ─────────────────────────────────────────────────────────────────
+
+let currentNotePath = null;
+let notesTransform = { tx: 0, ty: 0, scale: 1 };
+
+function applyNotesTransform() {
+  const g = document.getElementById('notes-cluster-viewport');
+  if (g) g.setAttribute('transform', `translate(${notesTransform.tx} ${notesTransform.ty}) scale(${notesTransform.scale})`);
+}
+
+function groupLabel(key) {
+  if (key === 'notes') return '~/notes/';
+  if (key === 'consolidated') return 'Consolidated';
+  return 'memory · ' + key.replace('memory:', '');
+}
+
+async function renderNotesCluster() {
+  const svg = document.getElementById('notes-cluster-svg');
+  const emptyEl = document.getElementById('notes-cluster-empty');
+  const { groups } = await fetch('/api/notes').then(r => r.json());
+
+  // Filter out empty groups, relabel keys
+  const map = new Map();
+  for (const [key, files] of Object.entries(groups)) {
+    if (!files || !files.length) continue;
+    map.set(groupLabel(key), files);
+  }
+
+  if (!map.size) {
+    svg.innerHTML = '';
+    emptyEl.style.display = 'flex';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  renderClusterViz({
+    svg,
+    viewportId: 'notes-cluster-viewport',
+    groups: map,
+    colorFn: (name) => themeColor(name) || '#888',
+    dotMeta: Object.assign(
+      (file, group) => ({
+        done: false,
+        data: { path: file.path, name: file.label || file.name, group, preview: file.preview || '', mtime: file.mtime },
+      }),
+      { subText: (items) => `${items.length} ${items.length === 1 ? 'note' : 'notes'}` }
+    ),
+    transform: notesTransform,
+  });
+
+  attachNotesTooltips();
+
+  setupPanZoom('notes-cluster-svg',
+    { in: 'notes-zoom-in', out: 'notes-zoom-out', reset: 'notes-reset' },
+    notesTransform,
+    applyNotesTransform);
+}
+
+function attachNotesTooltips() {
+  const svg = document.getElementById('notes-cluster-svg');
+  const tip = document.getElementById('notes-cluster-tooltip');
+  const wrap = document.getElementById('notes-cluster-pane');
+
+  svg.querySelectorAll('.cluster-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', () => {
+      const name = dot.dataset.name;
+      const group = dot.dataset.group;
+      const preview = dot.dataset.preview;
+      const mtime = dot.dataset.mtime;
+      tip.style.setProperty('--theme-color', themeColor(group) || 'var(--accent)');
+      tip.innerHTML = `
+        <div class="tip-theme">${escapeHtml(group)} · ${escapeHtml(timeAgo(mtime))}</div>
+        <div class="tip-name">${escapeHtml(name)}</div>
+        ${preview ? `<div class="tip-preview">${escapeHtml(preview)}</div>` : ''}
+      `;
+      tip.style.display = 'block';
+
+      const dotRect = dot.getBoundingClientRect();
+      const wrapRect = wrap.getBoundingClientRect();
+      const cx = dotRect.left + dotRect.width / 2 - wrapRect.left;
+      const cy = dotRect.top + dotRect.height / 2 - wrapRect.top;
+      const tipW = 320;
+      const flipX = cx + 14 + tipW > wrap.clientWidth ? cx - 14 - tipW : cx + 14;
+      tip.style.left = Math.max(4, flipX) + 'px';
+      tip.style.top = Math.max(4, cy + 14) + 'px';
+    });
+    dot.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    dot.addEventListener('click', () => openNote(dot.dataset.path));
+  });
+}
+
+async function openNote(p) {
+  currentNotePath = p;
+  const { content } = await fetch(`/api/notes/content?path=${encodeURIComponent(p)}`).then(r => r.json());
+  document.getElementById('notes-current-path').textContent = p;
+  document.getElementById('notes-content').innerHTML = marked.parse(content || '');
+}
+
+window.addEventListener('resize', () => { if (activeTab === 'notes') renderNotesCluster(); });
+
+// ── Help tab ──────────────────────────────────────────────────────────────────
+
+async function loadCommands() {
+  const { commands } = await fetch('/api/commands').then(r => r.json());
+  const list = document.getElementById('commands-list');
+  list.innerHTML = '';
+  if (!commands.length) {
+    list.innerHTML = '<div style="color:var(--text-faint);font-style:italic;font-size:11px;padding:8px">No slash commands in ~/.claude/commands/</div>';
+    return;
+  }
+  commands.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'command-item';
+    item.innerHTML = `
+      <div class="command-name">/${escapeHtml(c.name)}</div>
+      <div class="command-desc">${escapeHtml(c.description || '(no description)')}</div>
+      ${c.argumentHint ? `<div class="command-args">args: ${escapeHtml(c.argumentHint)}</div>` : ''}
+      <div class="command-body-toggle">▸ Show prompt</div>
+      <div class="command-body">${escapeHtml(c.body)}</div>
     `;
-    div.querySelector('.todo-check').addEventListener('click', async () => {
-      await fetch(`/api/todos/${todo.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ done: !todo.done }),
-      });
-      loadTodos();
+    item.querySelector('.command-body-toggle').addEventListener('click', () => {
+      const body = item.querySelector('.command-body');
+      const toggle = item.querySelector('.command-body-toggle');
+      body.classList.toggle('open');
+      toggle.textContent = body.classList.contains('open') ? '▾ Hide prompt' : '▸ Show prompt';
     });
-    div.querySelector('.delete-todo').addEventListener('click', async () => {
-      await fetch(`/api/todos/${todo.id}`, { method: 'DELETE' });
-      loadTodos();
-    });
-    list.appendChild(div);
+    list.appendChild(item);
   });
 }
 
-async function addTodo() {
-  const input = document.getElementById('todo-input');
-  const text = input.value.trim();
-  if (!text) return;
-  await fetch('/api/todos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  });
-  input.value = '';
-  loadTodos();
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-
-document.getElementById('todo-add-btn').addEventListener('click', addTodo);
-document.getElementById('todo-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') addTodo();
-});
-
-document.getElementById('todo-send-btn').addEventListener('click', async () => {
-  const todos = await fetch('/api/todos').then(r => r.json());
-  const open = todos.filter(t => !t.done);
-  if (!open.length) { showFeedback('todo-feedback', 'No open tasks'); return; }
-  const list = open.map(t => `- [ ] ${t.text}`).join('\n');
-  sendToTerminal(`Here are my current tasks — help me work through them:\n\n${list}\r`);
-  showFeedback('todo-feedback', 'Sent to Claude');
-});
+function escapeAttr(s) { return escapeHtml(s); }
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
@@ -1325,29 +1983,18 @@ document.addEventListener('keydown', e => {
   switch (e.key) {
     case '1':
       e.preventDefault();
+      setActiveTab('home');
       t1.term.focus();
       break;
     case '2':
       e.preventDefault();
+      setActiveTab('home');
       t2.term.focus();
       break;
-    case 't':
-    case 'T':
+    case 'd':
+    case 'D':
       e.preventDefault();
-      document.getElementById('todo-input').focus();
-      // Expand todo panel if collapsed
-      const todoBody = document.getElementById('todo-body');
-      if (todoBody.classList.contains('collapsed')) todoBody.classList.remove('collapsed');
-      break;
-    case 'b':
-    case 'B':
-      e.preventDefault();
-      document.getElementById('brief-btn').click();
-      break;
-    case 'r':
-    case 'R':
-      e.preventDefault();
-      document.getElementById('recap-btn').click();
+      setActiveTab('todo');
       break;
   }
 });
@@ -1355,10 +2002,9 @@ document.addEventListener('keydown', e => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 loadConfig();
-loadClaudeMd('');
-loadSkills();
+loadClaudeMd();
 loadMemory();
-loadTodos();
+loadCommands();
 </script>
 </body>
 </html>

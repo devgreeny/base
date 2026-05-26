@@ -13,6 +13,8 @@ const wss = new WebSocketServer({ server });
 
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 const TODOS_PATH  = path.join(__dirname, 'todos.json');
+const DUMPS_DIR   = path.join(__dirname, 'data', 'dumps');
+if (!fs.existsSync(DUMPS_DIR)) fs.mkdirSync(DUMPS_DIR, { recursive: true });
 
 // Memory dir matches where Claude Code reads from — keyed to home dir since that's the CWD we spawn Claude with
 const MEMORY_DIR = path.join(
@@ -175,17 +177,51 @@ app.get('/api/recent', (req, res) => {
 // ── Skills ────────────────────────────────────────────────────────────────────
 
 const SKILLS_DIR = path.join(os.homedir(), 'skills');
+const CC_SKILLS_DIR = path.join(os.homedir(), '.claude', 'skills');
 if (!fs.existsSync(SKILLS_DIR)) fs.mkdirSync(SKILLS_DIR, { recursive: true });
 
+function parseSkillFrontmatter(content) {
+  const m = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) return {};
+  const out = {};
+  const descMatch = m[1].match(/^description:\s*(.+)$/m);
+  if (descMatch) out.description = descMatch[1].trim();
+  return out;
+}
+
 app.get('/api/skills', (req, res) => {
-  const files = fs.readdirSync(SKILLS_DIR).filter(f => f.endsWith('.md')).sort();
-  res.json(files.map(f => ({ name: f.replace(/\.md$/, '') })));
+  const out = [];
+
+  // Base flat skills: ~/skills/*.md  (editable)
+  if (fs.existsSync(SKILLS_DIR)) {
+    for (const f of fs.readdirSync(SKILLS_DIR).filter(f => f.endsWith('.md')).sort()) {
+      out.push({ name: f.replace(/\.md$/, ''), kind: 'flat' });
+    }
+  }
+
+  // Agent Skills: ~/.claude/skills/<name>/SKILL.md  (read-only)
+  if (fs.existsSync(CC_SKILLS_DIR)) {
+    for (const dir of fs.readdirSync(CC_SKILLS_DIR).sort()) {
+      const skillFile = path.join(CC_SKILLS_DIR, dir, 'SKILL.md');
+      if (!fs.existsSync(skillFile)) continue;
+      let description = '';
+      try { description = parseSkillFrontmatter(fs.readFileSync(skillFile, 'utf8')).description || ''; } catch {}
+      out.push({ name: dir, kind: 'agent', description });
+    }
+  }
+
+  res.json(out);
 });
 
 app.get('/api/skills/:name', (req, res) => {
-  const p = path.join(SKILLS_DIR, req.params.name + '.md');
-  if (!fs.existsSync(p)) return res.status(404).json({ error: 'Not found' });
-  res.json({ content: fs.readFileSync(p, 'utf8') });
+  const name = req.params.name;
+  // Try flat first
+  const flat = path.join(SKILLS_DIR, name + '.md');
+  if (fs.existsSync(flat)) return res.json({ content: fs.readFileSync(flat, 'utf8'), kind: 'flat' });
+  // Try agent skill
+  const agent = path.join(CC_SKILLS_DIR, name, 'SKILL.md');
+  if (fs.existsSync(agent)) return res.json({ content: fs.readFileSync(agent, 'utf8'), kind: 'agent' });
+  res.status(404).json({ error: 'Not found' });
 });
 
 app.post('/api/skills/:name', (req, res) => {
@@ -193,6 +229,10 @@ app.post('/api/skills/:name', (req, res) => {
   if (content === undefined) return res.status(400).json({ error: 'No content' });
   const name = req.params.name.replace(/[^a-zA-Z0-9_-]/g, '');
   if (!name) return res.status(400).json({ error: 'Invalid name' });
+  // Agent skills are read-only — don't allow overwriting
+  if (fs.existsSync(path.join(CC_SKILLS_DIR, name, 'SKILL.md'))) {
+    return res.status(403).json({ error: 'Agent skill is read-only' });
+  }
   fs.writeFileSync(path.join(SKILLS_DIR, name + '.md'), content);
   res.json({ ok: true });
 });
@@ -214,10 +254,11 @@ function saveTodos(todos) { fs.writeFileSync(TODOS_PATH, JSON.stringify(todos, n
 app.get('/api/todos', (req, res) => res.json(loadTodos()));
 
 app.post('/api/todos', (req, res) => {
-  const { text } = req.body;
+  const { text, theme } = req.body;
   if (!text) return res.status(400).json({ error: 'text required' });
   const todos = loadTodos();
   const todo = { id: Date.now(), text, done: false, createdAt: new Date().toISOString() };
+  if (theme) todo.theme = theme;
   todos.push(todo);
   saveTodos(todos);
   res.json(todo);
@@ -236,6 +277,165 @@ app.patch('/api/todos/:id', (req, res) => {
 app.delete('/api/todos/:id', (req, res) => {
   saveTodos(loadTodos().filter(t => t.id !== parseInt(req.params.id)));
   res.json({ ok: true });
+});
+
+// ── Dumps ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/dumps', (req, res) => {
+  const files = fs.readdirSync(DUMPS_DIR).filter(f => /^dump-\d+\.txt$/.test(f));
+  const dumps = files.map(f => {
+    const ts = f.match(/^dump-(\d+)\.txt$/)[1];
+    const rawPath = path.join(DUMPS_DIR, f);
+    const orgPath = path.join(DUMPS_DIR, `dump-${ts}.organized.json`);
+    const raw = fs.readFileSync(rawPath, 'utf8');
+    return {
+      ts,
+      createdAt: fs.statSync(rawPath).mtime.toISOString(),
+      preview: raw.slice(0, 140),
+      organized: fs.existsSync(orgPath),
+    };
+  }).sort((a, b) => b.ts.localeCompare(a.ts));
+  res.json({ dumps });
+});
+
+app.post('/api/dumps', (req, res) => {
+  const { text } = req.body;
+  if (!text || !text.trim()) return res.status(400).json({ error: 'text required' });
+  const ts = Date.now().toString();
+  const rawPath = path.join(DUMPS_DIR, `dump-${ts}.txt`);
+  const orgPath = path.join(DUMPS_DIR, `dump-${ts}.organized.json`);
+  fs.writeFileSync(rawPath, text);
+  res.json({ ts, rawPath, orgPath });
+});
+
+app.get('/api/dumps/:ts', (req, res) => {
+  const ts = req.params.ts.replace(/[^0-9]/g, '');
+  if (!ts) return res.status(400).json({ error: 'bad ts' });
+  const rawPath = path.join(DUMPS_DIR, `dump-${ts}.txt`);
+  const orgPath = path.join(DUMPS_DIR, `dump-${ts}.organized.json`);
+  if (!fs.existsSync(rawPath)) return res.status(404).json({ error: 'not found' });
+  const raw = fs.readFileSync(rawPath, 'utf8');
+  let organized = null;
+  if (fs.existsSync(orgPath)) {
+    try { organized = JSON.parse(fs.readFileSync(orgPath, 'utf8')); } catch {}
+  }
+  res.json({ ts, raw, organized });
+});
+
+app.delete('/api/dumps/:ts', (req, res) => {
+  const ts = req.params.ts.replace(/[^0-9]/g, '');
+  if (!ts) return res.status(400).json({ error: 'bad ts' });
+  for (const f of [`dump-${ts}.txt`, `dump-${ts}.organized.json`]) {
+    const p = path.join(DUMPS_DIR, f);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
+  res.json({ ok: true });
+});
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+
+const NOTES_DIR = path.join(os.homedir(), 'notes');
+if (!fs.existsSync(NOTES_DIR)) fs.mkdirSync(NOTES_DIR, { recursive: true });
+
+function walkMd(dir, base = dir) {
+  const out = [];
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkMd(full, base));
+    else if (e.isFile() && e.name.endsWith('.md')) {
+      try {
+        const stat = fs.statSync(full);
+        let preview = '';
+        try {
+          const head = fs.readFileSync(full, 'utf8').slice(0, 600);
+          // Strip frontmatter for preview
+          preview = head.replace(/^---[\s\S]*?\n---\n/, '').replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim().slice(0, 160);
+        } catch {}
+        out.push({ path: full, name: e.name, mtime: stat.mtime.toISOString(), size: stat.size, preview });
+      } catch {}
+    }
+  }
+  return out;
+}
+
+app.get('/api/notes', (req, res) => {
+  const groups = {};
+
+  // ~/notes/
+  groups['notes'] = walkMd(NOTES_DIR).map(f => ({ ...f, label: path.relative(NOTES_DIR, f.path) }));
+
+  // ~/.claude/MEMORY_CONSOLIDATED.md
+  const consolidated = path.join(os.homedir(), '.claude', 'MEMORY_CONSOLIDATED.md');
+  if (fs.existsSync(consolidated)) {
+    const stat = fs.statSync(consolidated);
+    let preview = '';
+    try {
+      const head = fs.readFileSync(consolidated, 'utf8').slice(0, 600);
+      preview = head.replace(/^---[\s\S]*?\n---\n/, '').replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    } catch {}
+    groups['consolidated'] = [{ path: consolidated, name: 'MEMORY_CONSOLIDATED.md', label: 'MEMORY_CONSOLIDATED.md', mtime: stat.mtime.toISOString(), size: stat.size, preview }];
+  }
+
+  // ~/.claude/projects/<dir>/memory/*.md — group by project
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  if (fs.existsSync(projectsDir)) {
+    for (const dirName of fs.readdirSync(projectsDir)) {
+      const memDir = path.join(projectsDir, dirName, 'memory');
+      if (!fs.existsSync(memDir)) continue;
+      const files = walkMd(memDir).map(f => ({ ...f, label: path.relative(memDir, f.path) }));
+      if (!files.length) continue;
+      const parts = dirName.split('-').filter(Boolean);
+      const projectLabel = parts[parts.length - 1] || dirName;
+      const key = `memory:${projectLabel}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(...files);
+    }
+  }
+
+  // Sort each group by mtime desc
+  for (const k of Object.keys(groups)) {
+    groups[k].sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
+  }
+
+  res.json({ groups });
+});
+
+app.get('/api/notes/content', (req, res) => {
+  const p = req.query.path;
+  if (!p) return res.status(400).json({ error: 'path required' });
+  // Whitelist roots
+  const roots = [NOTES_DIR, path.join(os.homedir(), '.claude')];
+  const abs = path.resolve(p);
+  if (!roots.some(r => abs.startsWith(r))) return res.status(403).json({ error: 'forbidden path' });
+  if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
+  res.json({ path: abs, content: fs.readFileSync(abs, 'utf8') });
+});
+
+// ── Commands (slash commands) ────────────────────────────────────────────────
+
+const COMMANDS_DIR = path.join(os.homedir(), '.claude', 'commands');
+
+app.get('/api/commands', (req, res) => {
+  if (!fs.existsSync(COMMANDS_DIR)) return res.json({ commands: [] });
+  const files = fs.readdirSync(COMMANDS_DIR).filter(f => f.endsWith('.md')).sort();
+  const commands = files.map(f => {
+    const full = path.join(COMMANDS_DIR, f);
+    const content = fs.readFileSync(full, 'utf8');
+    const m = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    let description = '', argumentHint = '', body = content;
+    if (m) {
+      const fm = m[1];
+      body = m[2];
+      const descMatch = fm.match(/^description:\s*(.+)$/m);
+      const argMatch = fm.match(/^argument-hint:\s*(.+)$/m);
+      if (descMatch) description = descMatch[1].trim();
+      if (argMatch) argumentHint = argMatch[1].trim();
+    }
+    return { name: f.replace(/\.md$/, ''), description, argumentHint, body: body.trim() };
+  });
+  res.json({ commands });
 });
 
 // ── Terminal input injection ───────────────────────────────────────────────────
@@ -466,15 +666,15 @@ function restartClaude() {
 
 setInterval(() => {
   const idleMs = Date.now() - lastInteraction;
-  const THIRTY_MIN = 30 * 60 * 1000;
-  if (idleMs < THIRTY_MIN) { heartbeatFired = false; return; }
+  const SIXTY_MIN = 60 * 60 * 1000;
+  if (idleMs < SIXTY_MIN) { heartbeatFired = false; return; }
   if (heartbeatFired) return;
   heartbeatFired = true;
 
   const sess = SESSIONS[1];
   if (!sess.term) return;
 
-  console.log('[heartbeat] 30 min idle — saving session summary');
+  console.log('[heartbeat] 60 min idle — saving session summary');
   const mark = sess.buf.length;
   const prompt = 'Summarize this session for my memory system. Format exactly as shown, no extra text:\n\nPROJECT: [one of: pb, FootyBanter, wheredhego_v1, genie, 3ptventures, aini, Clockify_alt, base, or general]\n\n## What we did\n[2-4 bullet points]\n\n## Key decisions\n[choices made that future-me should know]\n\n## Next\n[open items, what to pick up next session]';
   sess.term.write(prompt + '\r');
