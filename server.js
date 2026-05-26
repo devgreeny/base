@@ -14,10 +14,10 @@ const wss = new WebSocketServer({ server });
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 const TODOS_PATH  = path.join(__dirname, 'todos.json');
 
-// Memory dir mirrors Claude Code's own memory for this project
+// Memory dir matches where Claude Code reads from — keyed to home dir since that's the CWD we spawn Claude with
 const MEMORY_DIR = path.join(
   os.homedir(), '.claude', 'projects',
-  __dirname.replace(/\//g, '-'),
+  os.homedir().replace(/\//g, '-'),
   'memory'
 );
 
@@ -172,6 +172,37 @@ app.get('/api/recent', (req, res) => {
   res.json({ sessions: sessions.slice(0, 30) });
 });
 
+// ── Skills ────────────────────────────────────────────────────────────────────
+
+const SKILLS_DIR = path.join(os.homedir(), 'skills');
+if (!fs.existsSync(SKILLS_DIR)) fs.mkdirSync(SKILLS_DIR, { recursive: true });
+
+app.get('/api/skills', (req, res) => {
+  const files = fs.readdirSync(SKILLS_DIR).filter(f => f.endsWith('.md')).sort();
+  res.json(files.map(f => ({ name: f.replace(/\.md$/, '') })));
+});
+
+app.get('/api/skills/:name', (req, res) => {
+  const p = path.join(SKILLS_DIR, req.params.name + '.md');
+  if (!fs.existsSync(p)) return res.status(404).json({ error: 'Not found' });
+  res.json({ content: fs.readFileSync(p, 'utf8') });
+});
+
+app.post('/api/skills/:name', (req, res) => {
+  const { content } = req.body;
+  if (content === undefined) return res.status(400).json({ error: 'No content' });
+  const name = req.params.name.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!name) return res.status(400).json({ error: 'Invalid name' });
+  fs.writeFileSync(path.join(SKILLS_DIR, name + '.md'), content);
+  res.json({ ok: true });
+});
+
+app.delete('/api/skills/:name', (req, res) => {
+  const p = path.join(SKILLS_DIR, req.params.name + '.md');
+  if (fs.existsSync(p)) fs.unlinkSync(p);
+  res.json({ ok: true });
+});
+
 // ── Todos ─────────────────────────────────────────────────────────────────────
 
 function loadTodos() {
@@ -257,7 +288,14 @@ function spawnSession(termNum) {
   });
 
   try {
-    sess.term = trySpawn(termNum === 1 ? 'claude' : shell);
+    if (termNum === 1) {
+      sess.term = pty.spawn('claude', ['--dangerously-skip-permissions'], {
+        name: 'xterm-256color', cols: sess.cols, rows: sess.rows, cwd,
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', PATH: `${process.env.PATH}:${os.homedir()}/.local/bin` },
+      });
+    } else {
+      sess.term = trySpawn(shell);
+    }
   } catch (err) {
     if (termNum === 1) {
       try {
@@ -276,6 +314,7 @@ function spawnSession(termNum) {
   });
 
   sess.term.onExit(({ exitCode }) => {
+    if (termNum === 1 && !heartbeatFired) saveRawBuffer('unexpected-exit');
     sess.term = null;
     const msg = `\r\n\x1b[33m[exited with code ${exitCode}]\x1b[0m\r\n`;
     sess.buf += msg;
@@ -313,12 +352,139 @@ wss.on('connection', (ws, req) => {
         return;
       }
     } catch {}
+    if (termNum === 1) lastInteraction = Date.now();
     sess.term.write(str);
   });
 
   ws.on('close', () => { if (sess.ws === ws) sess.ws = null; });
   ws.on('error', () => { if (sess.ws === ws) sess.ws = null; });
 });
+
+// ── Heartbeat — auto-wrap + restart after 30 min idle ─────────────────────────
+
+let lastInteraction = Date.now();
+let heartbeatFired = false;
+let lastSnapshotLen = 0;
+
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
+            .replace(/\x1b\][^\x07]*\x07/g, '')
+            .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '');
+}
+
+const PROJECT_NAMES = ['pb', 'FootyBanter', 'wheredhego_v1', 'genie', '3ptventures', 'aini', 'Clockify_alt', 'base'];
+
+function projectMemoryDir(projectName) {
+  const p = `/Users/noah/Desktop/Projects/${projectName}`;
+  return path.join(os.homedir(), '.claude', 'projects', p.replace(/\//g, '-'), 'memory');
+}
+
+function appendToIndex(dir, filename, label) {
+  const indexPath = path.join(dir, 'MEMORY.md');
+  const line = `- [${label}](${filename}) — ${label}`;
+  if (fs.existsSync(indexPath)) {
+    fs.appendFileSync(indexPath, '\n' + line);
+  } else {
+    fs.writeFileSync(indexPath, `# Memory Index\n\n${line}\n`);
+  }
+}
+
+function saveRawBuffer(reason) {
+  const sess = SESSIONS[1];
+  const content = stripAnsi(sess.buf).trim();
+  if (!content) return;
+  if (!fs.existsSync(MEMORY_DIR)) fs.mkdirSync(MEMORY_DIR, { recursive: true });
+  const ts = new Date().toISOString().slice(0, 10);
+  const filename = `raw_${reason}_${Date.now()}.md`;
+  fs.writeFileSync(
+    path.join(MEMORY_DIR, filename),
+    `---\nname: raw-${reason}-${ts}\ndescription: Raw session log (${reason}) ${ts}\nmetadata:\n  type: project\n---\n\n${content}\n`
+  );
+  appendToIndex(MEMORY_DIR, filename, `Raw log (${reason}) ${ts}`);
+  console.log(`[heartbeat] raw buffer saved: ${filename}`);
+}
+
+// Snapshot buffer every 5 min if new content exists
+setInterval(() => {
+  const sess = SESSIONS[1];
+  if (!sess.term || sess.buf.length === lastSnapshotLen) return;
+  lastSnapshotLen = sess.buf.length;
+  saveRawBuffer('snapshot');
+}, 5 * 60 * 1000);
+
+function saveHeartbeatMemory(raw) {
+  const content = raw.trim();
+  if (!content) return;
+
+  const ts = new Date().toISOString().slice(0, 10);
+
+  // Parse PROJECT line from Claude's response
+  const projectMatch = content.match(/^PROJECT:\s*(\S+)/m);
+  const detectedProject = projectMatch ? PROJECT_NAMES.find(p => p.toLowerCase() === projectMatch[1].toLowerCase()) : null;
+  const cleanContent = content.replace(/^PROJECT:.*\n?/m, '').trim();
+
+  // 1. Daily memory — append to today's file in Base memory dir
+  if (!fs.existsSync(MEMORY_DIR)) fs.mkdirSync(MEMORY_DIR, { recursive: true });
+  const dailyFile = `daily_${ts}.md`;
+  const dailyPath = path.join(MEMORY_DIR, dailyFile);
+  const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const dailyEntry = `\n## ${timestamp}${detectedProject ? ` — ${detectedProject}` : ''}\n\n${cleanContent}\n`;
+  if (fs.existsSync(dailyPath)) {
+    fs.appendFileSync(dailyPath, dailyEntry);
+  } else {
+    fs.writeFileSync(dailyPath, `---\nname: daily-${ts}\ndescription: Daily memory log ${ts}\nmetadata:\n  type: project\n---\n${dailyEntry}`);
+    appendToIndex(MEMORY_DIR, dailyFile, `Daily log ${ts}`);
+  }
+  console.log(`[heartbeat] appended to daily: ${dailyFile}`);
+
+  // 2. Project-specific memory
+  if (detectedProject) {
+    const projDir = projectMemoryDir(detectedProject);
+    if (!fs.existsSync(projDir)) fs.mkdirSync(projDir, { recursive: true });
+    const projFile = `session_${ts}_${Date.now()}.md`;
+    fs.writeFileSync(
+      path.join(projDir, projFile),
+      `---\nname: session-${ts}\ndescription: Session summary ${ts}\nmetadata:\n  type: project\n---\n\n${cleanContent}\n`
+    );
+    appendToIndex(projDir, projFile, `Session ${ts} (auto)`);
+    console.log(`[heartbeat] saved to project ${detectedProject}: ${projFile}`);
+  }
+}
+
+function restartClaude() {
+  const sess = SESSIONS[1];
+  if (sess.term) { try { sess.term.kill(); } catch {} sess.term = null; }
+  sess.buf = '';
+  const notice = '\r\n\x1b[33m[session auto-saved — restarting Claude]\x1b[0m\r\n';
+  sess.buf += notice;
+  if (sess.ws?.readyState === 1) sess.ws.send(notice);
+  setTimeout(() => {
+    spawnSession(1);
+    if (sess.ws?.readyState === 1 && sess.buf) sess.ws.send(sess.buf);
+  }, 1000);
+}
+
+setInterval(() => {
+  const idleMs = Date.now() - lastInteraction;
+  const THIRTY_MIN = 30 * 60 * 1000;
+  if (idleMs < THIRTY_MIN) { heartbeatFired = false; return; }
+  if (heartbeatFired) return;
+  heartbeatFired = true;
+
+  const sess = SESSIONS[1];
+  if (!sess.term) return;
+
+  console.log('[heartbeat] 30 min idle — saving session summary');
+  const mark = sess.buf.length;
+  const prompt = 'Summarize this session for my memory system. Format exactly as shown, no extra text:\n\nPROJECT: [one of: pb, FootyBanter, wheredhego_v1, genie, 3ptventures, aini, Clockify_alt, base, or general]\n\n## What we did\n[2-4 bullet points]\n\n## Key decisions\n[choices made that future-me should know]\n\n## Next\n[open items, what to pick up next session]';
+  sess.term.write(prompt + '\r');
+
+  setTimeout(() => {
+    const captured = stripAnsi(sess.buf.slice(mark)).trim();
+    saveHeartbeatMemory(captured);
+    restartClaude();
+  }, 45000);
+}, 60000);
 
 const cfg = loadConfig();
 const PORT = cfg.port || 3000;

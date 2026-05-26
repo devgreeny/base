@@ -253,11 +253,70 @@
   }
 
   /* ── CLAUDE.md Panel ─────────────────────────── */
-  #claudemd-path {
+  .claudemd-path {
     font-size: 9px;
     color: var(--text-faint);
     margin-bottom: 6px;
     word-break: break-all;
+  }
+
+  .sub-label {
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 5px;
+  }
+
+  .sub-section {
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Skills Panel ────────────────────────────── */
+  .skill-item {
+    border-bottom: 1px solid var(--border);
+  }
+  .skill-item:last-child { border-bottom: none; }
+
+  .skill-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+  }
+
+  .skill-check {
+    width: 13px; height: 13px;
+    border: 1px solid var(--border);
+    background: var(--bg1);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--accent);
+  }
+  .skill-check.active { background: var(--accent-dim); border-color: var(--accent); }
+
+  .skill-name {
+    flex: 1;
+    font-size: 10px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .skill-name:hover { color: var(--accent); }
+
+  .skill-editor { display: none; padding-bottom: 6px; }
+  .skill-editor.open { display: block; }
+
+  #skills-empty {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 4px 0 6px;
   }
 
   /* ── Memory Panel ────────────────────────────── */
@@ -632,12 +691,42 @@
         <span>▾</span>
       </div>
       <div class="panel-body collapsed" id="claudemd-body">
-        <div id="claudemd-path"></div>
-        <textarea id="claudemd-input" style="min-height:140px;max-height:360px"></textarea>
+        <div class="sub-label">Global</div>
+        <div class="claudemd-path" id="global-claudemd-path"></div>
+        <textarea id="global-claudemd-input" style="min-height:120px;max-height:280px"></textarea>
         <div class="btn-row">
-          <button class="btn btn-accent" id="save-claudemd-btn">Save</button>
+          <button class="btn btn-accent" id="save-global-claudemd-btn">Save</button>
         </div>
-        <div class="feedback-line" id="claudemd-feedback"></div>
+        <div class="feedback-line" id="global-claudemd-feedback"></div>
+
+        <div class="sub-section" id="project-claudemd-section" style="display:none">
+          <div class="sub-label">Project</div>
+          <div class="claudemd-path" id="project-claudemd-path"></div>
+          <textarea id="project-claudemd-input" style="min-height:100px;max-height:240px"></textarea>
+          <div class="btn-row">
+            <button class="btn btn-accent" id="save-project-claudemd-btn">Save</button>
+          </div>
+          <div class="feedback-line" id="project-claudemd-feedback"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skills -->
+    <div class="panel" id="skills-panel">
+      <div class="panel-header" data-panel="skills-body">
+        <span class="panel-title">Skills</span>
+        <span>▸</span>
+      </div>
+      <div class="panel-body collapsed" id="skills-body">
+        <div id="skills-list"></div>
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn btn-accent" id="send-skills-btn">Send Active to Claude</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" id="new-skill-input" placeholder="skill-name" style="flex:1">
+          <button class="btn" id="new-skill-btn" style="flex:0;padding:5px 10px;white-space:nowrap">+ New</button>
+        </div>
+        <div class="feedback-line" id="skills-feedback"></div>
       </div>
     </div>
 
@@ -925,20 +1014,137 @@ document.getElementById('project-select').addEventListener('change', e => select
 // ── CLAUDE.md ─────────────────────────────────────────────────────────────────
 
 async function loadClaudeMd(projectPath) {
-  const url = projectPath ? `/api/claude-md?project=${encodeURIComponent(projectPath)}` : '/api/claude-md';
-  const { content, path } = await fetch(url).then(r => r.json());
-  document.getElementById('claudemd-input').value = content;
-  document.getElementById('claudemd-path').textContent = path;
+  // Always load global
+  const global = await fetch('/api/claude-md').then(r => r.json());
+  document.getElementById('global-claudemd-input').value = global.content;
+  document.getElementById('global-claudemd-path').textContent = global.path;
+
+  // Load project if selected
+  const section = document.getElementById('project-claudemd-section');
+  if (projectPath) {
+    const proj = await fetch(`/api/claude-md?project=${encodeURIComponent(projectPath)}`).then(r => r.json());
+    document.getElementById('project-claudemd-input').value = proj.content;
+    document.getElementById('project-claudemd-path').textContent = proj.path;
+    section.style.display = '';
+  } else {
+    section.style.display = 'none';
+  }
 }
 
-document.getElementById('save-claudemd-btn').addEventListener('click', async () => {
-  const content = document.getElementById('claudemd-input').value;
+document.getElementById('save-global-claudemd-btn').addEventListener('click', async () => {
+  const content = document.getElementById('global-claudemd-input').value;
   await fetch('/api/claude-md', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project: activeProject || null, content }),
+    body: JSON.stringify({ project: null, content }),
   });
-  showFeedback('claudemd-feedback', 'Saved');
+  showFeedback('global-claudemd-feedback', 'Saved');
+});
+
+document.getElementById('save-project-claudemd-btn').addEventListener('click', async () => {
+  if (!activeProject) return;
+  const content = document.getElementById('project-claudemd-input').value;
+  await fetch('/api/claude-md', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: activeProject, content }),
+  });
+  showFeedback('project-claudemd-feedback', 'Saved');
+});
+
+// ── Skills ────────────────────────────────────────────────────────────────────
+
+const activeSkills = new Set();
+
+async function loadSkills() {
+  const skills = await fetch('/api/skills').then(r => r.json());
+  const list = document.getElementById('skills-list');
+  list.innerHTML = '';
+
+  if (!skills.length) {
+    list.innerHTML = '<div id="skills-empty">No skills yet — create one below</div>';
+    return;
+  }
+
+  skills.forEach(({ name }) => {
+    const item = document.createElement('div');
+    item.className = 'skill-item';
+    item.innerHTML = `
+      <div class="skill-row">
+        <div class="skill-check ${activeSkills.has(name) ? 'active' : ''}" data-skill="${name}">${activeSkills.has(name) ? '✓' : ''}</div>
+        <span class="skill-name" data-skill="${name}">${name}</span>
+        <button class="icon-btn delete-skill" data-skill="${name}" title="Delete">✕</button>
+      </div>
+      <div class="skill-editor" id="editor-${name}">
+        <textarea style="min-height:80px;max-height:200px;margin-bottom:4px" id="skill-ta-${name}"></textarea>
+        <div class="btn-row">
+          <button class="btn btn-accent save-skill" data-skill="${name}">Save</button>
+        </div>
+      </div>
+    `;
+
+    item.querySelector('.skill-check').addEventListener('click', () => {
+      if (activeSkills.has(name)) activeSkills.delete(name);
+      else activeSkills.add(name);
+      loadSkills();
+    });
+
+    item.querySelector('.skill-name').addEventListener('click', async () => {
+      const editor = document.getElementById(`editor-${name}`);
+      const isOpen = editor.classList.toggle('open');
+      if (isOpen) {
+        const { content } = await fetch(`/api/skills/${encodeURIComponent(name)}`).then(r => r.json());
+        document.getElementById(`skill-ta-${name}`).value = content;
+      }
+    });
+
+    item.querySelector('.save-skill').addEventListener('click', async () => {
+      const content = document.getElementById(`skill-ta-${name}`).value;
+      await fetch(`/api/skills/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      showFeedback('skills-feedback', 'Saved');
+    });
+
+    item.querySelector('.delete-skill').addEventListener('click', async () => {
+      if (!confirm(`Delete skill "${name}"?`)) return;
+      await fetch(`/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      activeSkills.delete(name);
+      loadSkills();
+    });
+
+    list.appendChild(item);
+  });
+}
+
+document.getElementById('new-skill-btn').addEventListener('click', async () => {
+  const input = document.getElementById('new-skill-input');
+  const name = input.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!name) return;
+  await fetch(`/api/skills/${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: `# ${name}\n\n` }),
+  });
+  input.value = '';
+  loadSkills();
+});
+
+document.getElementById('new-skill-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('new-skill-btn').click();
+});
+
+document.getElementById('send-skills-btn').addEventListener('click', async () => {
+  if (!activeSkills.size) { showFeedback('skills-feedback', 'No skills active'); return; }
+  const contents = await Promise.all(
+    [...activeSkills].map(name =>
+      fetch(`/api/skills/${encodeURIComponent(name)}`).then(r => r.json()).then(d => `## Skill: ${name}\n\n${d.content}`)
+    )
+  );
+  sendToTerminal(`Here are my active skills for this session:\n\n${contents.join('\n\n---\n\n')}\r`);
+  showFeedback('skills-feedback', 'Sent to Claude');
 });
 
 async function loadMemory() {
@@ -1150,6 +1356,7 @@ document.addEventListener('keydown', e => {
 
 loadConfig();
 loadClaudeMd('');
+loadSkills();
 loadMemory();
 loadTodos();
 </script>
