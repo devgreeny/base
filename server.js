@@ -63,15 +63,26 @@ app.get('/api/git', (req, res) => {
 app.get('/api/claude-md', (req, res) => {
   const { project } = req.query;
   const p = project ? path.join(project, 'CLAUDE.md') : path.join(os.homedir(), 'CLAUDE.md');
-  res.json({ content: fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '', path: p });
+  let content = '';
+  try {
+    if (fs.statSync(p).isFile()) content = fs.readFileSync(p, 'utf8');
+  } catch {}
+  res.json({ content, path: p });
 });
 
 app.post('/api/claude-md', (req, res) => {
   const { project, content } = req.body;
   if (content === undefined) return res.status(400).json({ error: 'No content' });
   const p = project ? path.join(project, 'CLAUDE.md') : path.join(os.homedir(), 'CLAUDE.md');
-  fs.writeFileSync(p, content);
-  res.json({ ok: true });
+  try {
+    if (fs.existsSync(p) && !fs.statSync(p).isFile()) {
+      return res.status(400).json({ error: `${p} exists but is not a regular file` });
+    }
+    fs.writeFileSync(p, content);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Memory — reads/writes ~/.claude/projects/[this-project]/memory/
