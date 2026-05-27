@@ -389,27 +389,6 @@ app.get('/api/notes', (req, res) => {
     groups['consolidated'] = [{ path: consolidated, name: 'MEMORY_CONSOLIDATED.md', label: 'MEMORY_CONSOLIDATED.md', mtime: stat.mtime.toISOString(), size: stat.size, preview }];
   }
 
-  // ~/.claude/projects/<dir>/memory/MEMORY.md — one master index per project
-  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
-  if (fs.existsSync(projectsDir)) {
-    for (const dirName of fs.readdirSync(projectsDir)) {
-      const memDir = path.join(projectsDir, dirName, 'memory');
-      const masterPath = path.join(memDir, 'MEMORY.md');
-      if (!fs.existsSync(masterPath)) continue;
-      const stat = fs.statSync(masterPath);
-      let preview = '';
-      try {
-        const head = fs.readFileSync(masterPath, 'utf8').slice(0, 600);
-        preview = head.replace(/^---[\s\S]*?\n---\n/, '').replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim().slice(0, 160);
-      } catch {}
-      const parts = dirName.split('-').filter(Boolean);
-      const projectLabel = parts[parts.length - 1] || dirName;
-      const key = `memory:${projectLabel}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push({ path: masterPath, name: 'MEMORY.md', label: 'MEMORY.md', mtime: stat.mtime.toISOString(), size: stat.size, preview });
-    }
-  }
-
   // Sort each group by mtime desc
   for (const k of Object.keys(groups)) {
     groups[k].sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
