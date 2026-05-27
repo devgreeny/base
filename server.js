@@ -523,7 +523,6 @@ function spawnSession(termNum) {
   });
 
   sess.term.onExit(({ exitCode }) => {
-    if (termNum === 1 && !heartbeatFired) saveRawBuffer('unexpected-exit');
     sess.term = null;
     const msg = `\r\n\x1b[33m[exited with code ${exitCode}]\x1b[0m\r\n`;
     sess.buf += msg;
@@ -573,8 +572,6 @@ wss.on('connection', (ws, req) => {
 
 let lastInteraction = Date.now();
 let heartbeatFired = false;
-let lastSnapshotLen = 0;
-
 function stripAnsi(str) {
   return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
             .replace(/\x1b\][^\x07]*\x07/g, '')
@@ -597,29 +594,6 @@ function appendToIndex(dir, filename, label) {
     fs.writeFileSync(indexPath, `# Memory Index\n\n${line}\n`);
   }
 }
-
-function saveRawBuffer(reason) {
-  const sess = SESSIONS[1];
-  const content = stripAnsi(sess.buf).trim();
-  if (!content) return;
-  if (!fs.existsSync(MEMORY_DIR)) fs.mkdirSync(MEMORY_DIR, { recursive: true });
-  const ts = new Date().toISOString().slice(0, 10);
-  const filename = `raw_${reason}_${Date.now()}.md`;
-  fs.writeFileSync(
-    path.join(MEMORY_DIR, filename),
-    `---\nname: raw-${reason}-${ts}\ndescription: Raw session log (${reason}) ${ts}\nmetadata:\n  type: project\n---\n\n${content}\n`
-  );
-  appendToIndex(MEMORY_DIR, filename, `Raw log (${reason}) ${ts}`);
-  console.log(`[heartbeat] raw buffer saved: ${filename}`);
-}
-
-// Snapshot buffer every 5 min if new content exists
-setInterval(() => {
-  const sess = SESSIONS[1];
-  if (!sess.term || sess.buf.length === lastSnapshotLen) return;
-  lastSnapshotLen = sess.buf.length;
-  saveRawBuffer('snapshot');
-}, 5 * 60 * 1000);
 
 function saveHeartbeatMemory(raw) {
   const content = raw.trim();
