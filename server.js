@@ -389,19 +389,24 @@ app.get('/api/notes', (req, res) => {
     groups['consolidated'] = [{ path: consolidated, name: 'MEMORY_CONSOLIDATED.md', label: 'MEMORY_CONSOLIDATED.md', mtime: stat.mtime.toISOString(), size: stat.size, preview }];
   }
 
-  // ~/.claude/projects/<dir>/memory/*.md — group by project
+  // ~/.claude/projects/<dir>/memory/MEMORY.md — one master index per project
   const projectsDir = path.join(os.homedir(), '.claude', 'projects');
   if (fs.existsSync(projectsDir)) {
     for (const dirName of fs.readdirSync(projectsDir)) {
       const memDir = path.join(projectsDir, dirName, 'memory');
-      if (!fs.existsSync(memDir)) continue;
-      const files = walkMd(memDir).map(f => ({ ...f, label: path.relative(memDir, f.path) }));
-      if (!files.length) continue;
+      const masterPath = path.join(memDir, 'MEMORY.md');
+      if (!fs.existsSync(masterPath)) continue;
+      const stat = fs.statSync(masterPath);
+      let preview = '';
+      try {
+        const head = fs.readFileSync(masterPath, 'utf8').slice(0, 600);
+        preview = head.replace(/^---[\s\S]*?\n---\n/, '').replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim().slice(0, 160);
+      } catch {}
       const parts = dirName.split('-').filter(Boolean);
       const projectLabel = parts[parts.length - 1] || dirName;
       const key = `memory:${projectLabel}`;
       if (!groups[key]) groups[key] = [];
-      groups[key].push(...files);
+      groups[key].push({ path: masterPath, name: 'MEMORY.md', label: 'MEMORY.md', mtime: stat.mtime.toISOString(), size: stat.size, preview });
     }
   }
 
@@ -416,12 +421,26 @@ app.get('/api/notes', (req, res) => {
 app.get('/api/notes/content', (req, res) => {
   const p = req.query.path;
   if (!p) return res.status(400).json({ error: 'path required' });
-  // Whitelist roots
   const roots = [NOTES_DIR, path.join(os.homedir(), '.claude')];
   const abs = path.resolve(p);
   if (!roots.some(r => abs.startsWith(r))) return res.status(403).json({ error: 'forbidden path' });
   if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
   res.json({ path: abs, content: fs.readFileSync(abs, 'utf8') });
+});
+
+app.delete('/api/notes', (req, res) => {
+  const p = req.query.path;
+  if (!p) return res.status(400).json({ error: 'path required' });
+  const roots = [NOTES_DIR, path.join(os.homedir(), '.claude')];
+  const abs = path.resolve(p);
+  if (!roots.some(r => abs.startsWith(r))) return res.status(403).json({ error: 'forbidden path' });
+  if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
+  try {
+    fs.unlinkSync(abs);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Commands (slash commands) ────────────────────────────────────────────────

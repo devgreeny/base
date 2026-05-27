@@ -892,6 +892,26 @@
   }
   .command-body.open { display: block; }
 
+  /* ── Pinned tooltip + delete button ──────────────── */
+  #cluster-tooltip.pinned, #notes-cluster-tooltip.pinned { pointer-events: auto; }
+
+  .tip-delete-btn {
+    display: block;
+    margin-top: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s;
+  }
+  .tip-delete-btn:hover { background: var(--red); color: var(--bg); }
+
 </style>
 </head>
 <body>
@@ -1462,13 +1482,17 @@ function computeCentroids(n, w, h, clusterRadii) {
   let R = Math.min(w, h) * 0.32;
 
   if (clusterRadii && clusterRadii.length === n) {
+    // Minimum R so adjacent cluster circles don't overlap
     let maxAdjacentSum = 0;
     for (let i = 0; i < n; i++)
       maxAdjacentSum = Math.max(maxAdjacentSum, clusterRadii[i] + clusterRadii[(i + 1) % n]);
-    const needed = (maxAdjacentSum + 50) / (2 * Math.sin(Math.PI / n));
+    const minR = (maxAdjacentSum + 60) / (2 * Math.sin(Math.PI / n));
+    // Max R to keep centroids within viewport
     const maxClusterR = Math.max(...clusterRadii);
-    const ceiling = Math.min(w, h) / 2 - maxClusterR - 50;
-    R = Math.min(Math.max(R, needed), Math.max(ceiling, R));
+    const maxR = Math.min(w, h) / 2 - maxClusterR - 40;
+    // Non-overlap takes priority; only shrink if viewport constraint is looser
+    R = Math.max(R, minR);
+    if (maxR > minR) R = Math.min(R, maxR);
   }
 
   return Array.from({ length: n }, (_, i) => {
@@ -1635,6 +1659,7 @@ function setupPanZoom(svgId, ctrlIds, transform, applyFn) {
 }
 
 let clusterTransform = { tx: 0, ty: 0, scale: 1 };
+let pinnedTodoId = null;
 
 function applyClusterTransform() {
   const g = document.getElementById('cluster-viewport');
@@ -1820,33 +1845,81 @@ async function renderClusteredTodos() {
   }
 })();
 
+function positionTip(dot, tip, wrap, tipW) {
+  const dotRect = dot.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const cx = dotRect.left + dotRect.width / 2 - wrapRect.left;
+  const cy = dotRect.top + dotRect.height / 2 - wrapRect.top;
+  const flipX = cx + 14 + tipW > wrap.clientWidth ? cx - 14 - tipW : cx + 14;
+  tip.style.left = Math.max(4, flipX) + 'px';
+  tip.style.top = Math.max(4, cy + 14) + 'px';
+}
+
 function attachClusterTooltips() {
   const svg = document.getElementById('cluster-svg');
   const tip = document.getElementById('cluster-tooltip');
   const wrap = document.getElementById('cluster-viz-wrap');
 
+  pinnedTodoId = null;
+  tip.classList.remove('pinned');
+  tip.style.display = 'none';
+
+  function showTodoTip(dot, pinned) {
+    const text = dot.dataset.text;
+    const theme = dot.dataset.theme;
+    const done = dot.dataset.done === '1';
+    const id = dot.dataset.id;
+    tip.style.setProperty('--theme-color', themeColor(theme) || 'var(--accent)');
+    tip.classList.toggle('done', done);
+    tip.classList.toggle('pinned', pinned);
+    tip.innerHTML = `<div class="tip-theme">${escapeHtml(theme)}</div><div class="tip-text">${escapeHtml(text)}</div>${pinned ? `<button class="tip-delete-btn">Delete</button>` : ''}`;
+    if (pinned) {
+      tip.querySelector('.tip-delete-btn').addEventListener('click', async e => {
+        e.stopPropagation();
+        await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+        pinnedTodoId = null;
+        tip.classList.remove('pinned');
+        tip.style.display = 'none';
+        renderClusteredTodos();
+      });
+    }
+    tip.style.display = 'block';
+    positionTip(dot, tip, wrap, 280);
+  }
+
   svg.querySelectorAll('.cluster-dot').forEach(dot => {
     dot.addEventListener('mouseenter', () => {
-      const text = dot.dataset.text;
-      const theme = dot.dataset.theme;
-      const done = dot.dataset.done === '1';
-      tip.style.setProperty('--theme-color', themeColor(theme) || 'var(--accent)');
-      tip.classList.toggle('done', done);
-      tip.innerHTML = `<div class="tip-theme">${escapeHtml(theme)}</div><div class="tip-text">${escapeHtml(text)}</div>`;
-      tip.style.display = 'block';
-
-      // Use the dot's actual on-screen bounding box so any pan/zoom is reflected
-      const dotRect = dot.getBoundingClientRect();
-      const wrapRect = wrap.getBoundingClientRect();
-      const cx = dotRect.left + dotRect.width / 2 - wrapRect.left;
-      const cy = dotRect.top + dotRect.height / 2 - wrapRect.top;
-      const tipW = 280;
-      const flipX = cx + 14 + tipW > wrap.clientWidth ? cx - 14 - tipW : cx + 14;
-      tip.style.left = Math.max(4, flipX) + 'px';
-      tip.style.top = Math.max(4, cy + 14) + 'px';
+      if (pinnedTodoId) return;
+      showTodoTip(dot, false);
     });
-    dot.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    dot.addEventListener('mouseleave', () => {
+      if (pinnedTodoId) return;
+      tip.style.display = 'none';
+    });
+    dot.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = dot.dataset.id;
+      if (pinnedTodoId === id) {
+        pinnedTodoId = null;
+        tip.classList.remove('pinned');
+        tip.style.display = 'none';
+        return;
+      }
+      pinnedTodoId = id;
+      showTodoTip(dot, true);
+    });
   });
+
+  if (!wrap.dataset.dismissSetup) {
+    wrap.dataset.dismissSetup = '1';
+    wrap.addEventListener('click', e => {
+      if (!pinnedTodoId) return;
+      if (e.target.closest('#cluster-tooltip') || e.target.classList.contains('cluster-dot')) return;
+      pinnedTodoId = null;
+      tip.classList.remove('pinned');
+      tip.style.display = 'none';
+    });
+  }
 }
 
 window.addEventListener('resize', () => { if (activeTab === 'todo') renderClusteredTodos(); });
@@ -1859,6 +1932,7 @@ function refreshAllTodos() {
 
 let currentNotePath = null;
 let notesTransform = { tx: 0, ty: 0, scale: 1 };
+let pinnedNotePath = null;
 
 function applyNotesTransform() {
   const g = document.getElementById('notes-cluster-viewport');
@@ -1918,32 +1992,72 @@ function attachNotesTooltips() {
   const tip = document.getElementById('notes-cluster-tooltip');
   const wrap = document.getElementById('notes-cluster-pane');
 
+  pinnedNotePath = null;
+  tip.classList.remove('pinned');
+  tip.style.display = 'none';
+
+  function showNotesTip(dot, pinned) {
+    const name = dot.dataset.name;
+    const group = dot.dataset.group;
+    const preview = dot.dataset.preview;
+    const mtime = dot.dataset.mtime;
+    const notePath = dot.dataset.path;
+    tip.style.setProperty('--theme-color', themeColor(group) || 'var(--accent)');
+    tip.classList.toggle('pinned', pinned);
+    tip.innerHTML = `
+      <div class="tip-theme">${escapeHtml(group)} · ${escapeHtml(timeAgo(mtime))}</div>
+      <div class="tip-name">${escapeHtml(name)}</div>
+      ${preview ? `<div class="tip-preview">${escapeHtml(preview)}</div>` : ''}
+      ${pinned ? `<button class="tip-delete-btn">Delete</button>` : ''}
+    `;
+    if (pinned) {
+      tip.querySelector('.tip-delete-btn').addEventListener('click', async e => {
+        e.stopPropagation();
+        await fetch(`/api/notes?path=${encodeURIComponent(notePath)}`, { method: 'DELETE' });
+        pinnedNotePath = null;
+        tip.classList.remove('pinned');
+        tip.style.display = 'none';
+        renderNotesCluster();
+      });
+    }
+    tip.style.display = 'block';
+    positionTip(dot, tip, wrap, 320);
+  }
+
   svg.querySelectorAll('.cluster-dot').forEach(dot => {
     dot.addEventListener('mouseenter', () => {
-      const name = dot.dataset.name;
-      const group = dot.dataset.group;
-      const preview = dot.dataset.preview;
-      const mtime = dot.dataset.mtime;
-      tip.style.setProperty('--theme-color', themeColor(group) || 'var(--accent)');
-      tip.innerHTML = `
-        <div class="tip-theme">${escapeHtml(group)} · ${escapeHtml(timeAgo(mtime))}</div>
-        <div class="tip-name">${escapeHtml(name)}</div>
-        ${preview ? `<div class="tip-preview">${escapeHtml(preview)}</div>` : ''}
-      `;
-      tip.style.display = 'block';
-
-      const dotRect = dot.getBoundingClientRect();
-      const wrapRect = wrap.getBoundingClientRect();
-      const cx = dotRect.left + dotRect.width / 2 - wrapRect.left;
-      const cy = dotRect.top + dotRect.height / 2 - wrapRect.top;
-      const tipW = 320;
-      const flipX = cx + 14 + tipW > wrap.clientWidth ? cx - 14 - tipW : cx + 14;
-      tip.style.left = Math.max(4, flipX) + 'px';
-      tip.style.top = Math.max(4, cy + 14) + 'px';
+      if (pinnedNotePath) return;
+      showNotesTip(dot, false);
     });
-    dot.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
-    dot.addEventListener('click', () => openNote(dot.dataset.path));
+    dot.addEventListener('mouseleave', () => {
+      if (pinnedNotePath) return;
+      tip.style.display = 'none';
+    });
+    dot.addEventListener('click', e => {
+      e.stopPropagation();
+      const notePath = dot.dataset.path;
+      if (pinnedNotePath === notePath) {
+        pinnedNotePath = null;
+        tip.classList.remove('pinned');
+        tip.style.display = 'none';
+        return;
+      }
+      pinnedNotePath = notePath;
+      showNotesTip(dot, true);
+      openNote(notePath);
+    });
   });
+
+  if (!wrap.dataset.dismissSetup) {
+    wrap.dataset.dismissSetup = '1';
+    wrap.addEventListener('click', e => {
+      if (!pinnedNotePath) return;
+      if (e.target.closest('#notes-cluster-tooltip') || e.target.classList.contains('cluster-dot')) return;
+      pinnedNotePath = null;
+      tip.classList.remove('pinned');
+      tip.style.display = 'none';
+    });
+  }
 }
 
 async function openNote(p) {
