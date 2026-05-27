@@ -5,7 +5,7 @@ const pty = require('node-pty');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,10 +16,22 @@ const TODOS_PATH  = path.join(__dirname, 'todos.json');
 const DUMPS_DIR   = path.join(__dirname, 'data', 'dumps');
 if (!fs.existsSync(DUMPS_DIR)) fs.mkdirSync(DUMPS_DIR, { recursive: true });
 
+// Detect projects root for this machine
+const PROJECTS_ROOT = (() => {
+  for (const p of [
+    path.join(os.homedir(), 'Desktop', 'Projects'),
+    path.join(os.homedir(), 'projects'),
+    path.join(os.homedir(), 'Projects'),
+  ]) { if (fs.existsSync(p)) return p; }
+  return path.join(os.homedir(), 'Desktop', 'Projects');
+})();
+const PROJECTS_ROOT_ENCODED = PROJECTS_ROOT.replace(/\//g, '-');
+const HOME_ENCODED = os.homedir().replace(/\//g, '-');
+
 // Memory dir matches where Claude Code reads from — keyed to home dir since that's the CWD we spawn Claude with
 const MEMORY_DIR = path.join(
   os.homedir(), '.claude', 'projects',
-  os.homedir().replace(/\//g, '-'),
+  HOME_ENCODED,
   'memory'
 );
 
@@ -168,10 +180,11 @@ app.get('/api/recent', (req, res) => {
           }
         }
         if (lastTs) {
-          // Best-effort: last dash-segment of encoded path is the project folder name
-          const parts = dirName.split('-').filter(Boolean);
+          const projName = dirName.startsWith(PROJECTS_ROOT_ENCODED + '-')
+            ? dirName.slice(PROJECTS_ROOT_ENCODED.length + 1)
+            : dirName === HOME_ENCODED ? 'home' : dirName.split('-').filter(Boolean).pop() || dirName;
           sessions.push({
-            projectName: parts[parts.length - 1] || dirName,
+            projectName: projName,
             dirName,
             lastTs,
             firstMessage: firstUser || '',
@@ -568,77 +581,16 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => { if (sess.ws === ws) sess.ws = null; });
 });
 
-// ── Heartbeat — auto-wrap + restart after 30 min idle ─────────────────────────
+// ── Heartbeat — auto-restart after 60 min idle ────────────────────────────────
 
 let lastInteraction = Date.now();
 let heartbeatFired = false;
-function stripAnsi(str) {
-  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
-            .replace(/\x1b\][^\x07]*\x07/g, '')
-            .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '');
-}
-
-const PROJECT_NAMES = ['pb', 'FootyBanter', 'wheredhego_v1', 'genie', '3ptventures', 'aini', 'Clockify_alt', 'base'];
-
-function projectMemoryDir(projectName) {
-  const p = `/Users/noah/Desktop/Projects/${projectName}`;
-  return path.join(os.homedir(), '.claude', 'projects', p.replace(/\//g, '-'), 'memory');
-}
-
-function appendToIndex(dir, filename, label) {
-  const indexPath = path.join(dir, 'MEMORY.md');
-  const line = `- [${label}](${filename}) — ${label}`;
-  if (fs.existsSync(indexPath)) {
-    fs.appendFileSync(indexPath, '\n' + line);
-  } else {
-    fs.writeFileSync(indexPath, `# Memory Index\n\n${line}\n`);
-  }
-}
-
-function saveHeartbeatMemory(raw) {
-  const content = raw.trim();
-  if (!content) return;
-
-  const ts = new Date().toISOString().slice(0, 10);
-
-  // Parse PROJECT line from Claude's response
-  const projectMatch = content.match(/^PROJECT:\s*(\S+)/m);
-  const detectedProject = projectMatch ? PROJECT_NAMES.find(p => p.toLowerCase() === projectMatch[1].toLowerCase()) : null;
-  const cleanContent = content.replace(/^PROJECT:.*\n?/m, '').trim();
-
-  // 1. Daily memory — append to today's file in Base memory dir
-  if (!fs.existsSync(MEMORY_DIR)) fs.mkdirSync(MEMORY_DIR, { recursive: true });
-  const dailyFile = `daily_${ts}.md`;
-  const dailyPath = path.join(MEMORY_DIR, dailyFile);
-  const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const dailyEntry = `\n## ${timestamp}${detectedProject ? ` — ${detectedProject}` : ''}\n\n${cleanContent}\n`;
-  if (fs.existsSync(dailyPath)) {
-    fs.appendFileSync(dailyPath, dailyEntry);
-  } else {
-    fs.writeFileSync(dailyPath, `---\nname: daily-${ts}\ndescription: Daily memory log ${ts}\nmetadata:\n  type: project\n---\n${dailyEntry}`);
-    appendToIndex(MEMORY_DIR, dailyFile, `Daily log ${ts}`);
-  }
-  console.log(`[heartbeat] appended to daily: ${dailyFile}`);
-
-  // 2. Project-specific memory
-  if (detectedProject) {
-    const projDir = projectMemoryDir(detectedProject);
-    if (!fs.existsSync(projDir)) fs.mkdirSync(projDir, { recursive: true });
-    const projFile = `session_${ts}_${Date.now()}.md`;
-    fs.writeFileSync(
-      path.join(projDir, projFile),
-      `---\nname: session-${ts}\ndescription: Session summary ${ts}\nmetadata:\n  type: project\n---\n\n${cleanContent}\n`
-    );
-    appendToIndex(projDir, projFile, `Session ${ts} (auto)`);
-    console.log(`[heartbeat] saved to project ${detectedProject}: ${projFile}`);
-  }
-}
 
 function restartClaude() {
   const sess = SESSIONS[1];
   if (sess.term) { try { sess.term.kill(); } catch {} sess.term = null; }
   sess.buf = '';
-  const notice = '\r\n\x1b[33m[session auto-saved — restarting Claude]\x1b[0m\r\n';
+  const notice = '\r\n\x1b[33m[restarting Claude after idle]\x1b[0m\r\n';
   sess.buf += notice;
   if (sess.ws?.readyState === 1) sess.ws.send(notice);
   setTimeout(() => {
@@ -657,20 +609,179 @@ setInterval(() => {
   const sess = SESSIONS[1];
   if (!sess.term) return;
 
-  console.log('[heartbeat] 60 min idle — saving session summary');
-  const mark = sess.buf.length;
-  const prompt = 'Summarize this session for my memory system. Format exactly as shown, no extra text:\n\nPROJECT: [one of: pb, FootyBanter, wheredhego_v1, genie, 3ptventures, aini, Clockify_alt, base, or general]\n\n## What we did\n[2-4 bullet points]\n\n## Key decisions\n[choices made that future-me should know]\n\n## Next\n[open items, what to pick up next session]';
-  sess.term.write(prompt + '\r');
+  console.log('[heartbeat] 60 min idle — restarting Claude');
+  restartClaude();
+}, 60000);
 
-  setTimeout(() => {
-    const captured = stripAnsi(sess.buf.slice(mark)).trim();
-    saveHeartbeatMemory(captured);
-    restartClaude();
-  }, 45000);
+// ── Daily memory — one global summary + per-project appends at midnight ────────
+
+let lastDailyDate = new Date().toISOString().slice(0, 10);
+
+function extractProjectName(dirName) {
+  if (dirName.startsWith(PROJECTS_ROOT_ENCODED + '-')) return dirName.slice(PROJECTS_ROOT_ENCODED.length + 1) || null;
+  if (dirName === HOME_ENCODED) return 'home';
+  return null;
+}
+
+function readSessionText(filePath, dateStr) {
+  const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').filter(Boolean);
+  let hasToday = false;
+  const turns = [];
+  for (const line of lines) {
+    let e; try { e = JSON.parse(line); } catch { continue; }
+    if (e.timestamp?.slice(0, 10) === dateStr) hasToday = true;
+    if (e.type !== 'user' && e.type !== 'assistant') continue;
+    const c = e.message?.content;
+    let text = typeof c === 'string' ? c
+      : Array.isArray(c) ? c.filter(b => b.type === 'text').map(b => b.text).join(' ')
+      : '';
+    text = text.trim().replace(/\n+/g, ' ').slice(0, 600);
+    if (text) turns.push(`${e.type === 'user' ? 'Noah' : 'Claude'}: ${text}`);
+  }
+  return hasToday ? turns.join('\n') : null;
+}
+
+function runClaude(prompt) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('claude', ['-p', prompt], { env: { ...process.env } });
+    let out = '', err = '';
+    proc.stdout.on('data', d => out += d);
+    proc.stderr.on('data', d => err += d);
+    proc.on('close', code => code === 0 ? resolve(out.trim()) : reject(new Error(err || `exit ${code}`)));
+    const t = setTimeout(() => { proc.kill(); reject(new Error('claude -p timeout')); }, 120000);
+    proc.on('close', () => clearTimeout(t));
+  });
+}
+
+function upsertMemoryIndex(indexPath, filename, label) {
+  const entry = `- [${label}](${filename}) — ${label}`;
+  if (fs.existsSync(indexPath)) {
+    const idx = fs.readFileSync(indexPath, 'utf8');
+    if (idx.includes(filename)) {
+      fs.writeFileSync(indexPath, idx.split('\n').map(l => l.includes(filename) ? entry : l).join('\n'));
+    } else {
+      fs.appendFileSync(indexPath, '\n' + entry);
+    }
+  } else {
+    fs.writeFileSync(indexPath, `# Memory Index\n\n${entry}\n`);
+  }
+}
+
+async function saveDailySummary(dateStr) {
+  // Race guard: if the other machine already wrote today's summary into iCloud, skip.
+  const dailyFile = path.join(MEMORY_DIR, `daily_${dateStr}.md`);
+  if (fs.existsSync(dailyFile)) {
+    console.log(`[daily] ${dateStr} already exists (probably written by another machine) — skipping`);
+    return;
+  }
+
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  if (!fs.existsSync(projectsDir)) return;
+
+  // Collect sessions from today, grouped by project
+  const byProject = {};
+  for (const dirName of fs.readdirSync(projectsDir)) {
+    const projName = extractProjectName(dirName);
+    if (!projName) continue;
+    const dirPath = path.join(projectsDir, dirName);
+    try { if (!fs.statSync(dirPath).isDirectory()) continue; } catch { continue; }
+    let files = [];
+    try { files = fs.readdirSync(dirPath).filter(f => f.endsWith('.jsonl')); } catch { continue; }
+    for (const file of files) {
+      try {
+        const text = readSessionText(path.join(dirPath, file), dateStr);
+        if (!text) continue;
+        if (!byProject[projName]) byProject[projName] = [];
+        byProject[projName].push(text);
+      } catch {}
+    }
+  }
+
+  if (!Object.keys(byProject).length) { console.log(`[daily] no sessions for ${dateStr}`); return; }
+
+  // Build one transcript block with all projects
+  let transcriptBlock = '';
+  for (const [projName, texts] of Object.entries(byProject).sort()) {
+    transcriptBlock += `## ${projName}\n${texts.join('\n---\n').slice(0, 2500)}\n\n`;
+  }
+
+  // One claude -p call produces a structured daily summary with ## Project sections
+  const fullSummary = await runClaude(
+    `Summarize today's Claude Code sessions (${dateStr}). ` +
+    `Write a daily log organized by project. For each project use a "## ProjectName" header ` +
+    `and bullet points covering what was built/changed, key decisions, current state, open items. ` +
+    `Be specific — name files, features, technical details. No preamble.\n\n` +
+    `Today's sessions:\n${transcriptBlock}`
+  ).catch(e => { console.error('[daily] claude -p failed:', e.message); return null; });
+
+  if (!fullSummary) return;
+
+  // 1. Save global daily summary to home memory dir
+  if (!fs.existsSync(MEMORY_DIR)) fs.mkdirSync(MEMORY_DIR, { recursive: true });
+  const dailyFileName = `daily_${dateStr}.md`;
+  fs.writeFileSync(
+    dailyFile,
+    `---\nname: daily-${dateStr}\ndescription: Daily log ${dateStr}\nmetadata:\n  type: project\n---\n\n${fullSummary}\n`
+  );
+  upsertMemoryIndex(path.join(MEMORY_DIR, 'MEMORY.md'), dailyFileName, `Daily log ${dateStr}`);
+  console.log(`[daily] saved global summary for ${dateStr}`);
+
+  // 2. Parse ## sections and append to each active project's memory
+  const sections = {};
+  let cur = null, curLines = [];
+  for (const line of fullSummary.split('\n')) {
+    const m = line.match(/^##\s+(.+)$/);
+    if (m) {
+      if (cur) sections[cur] = curLines.join('\n').trim();
+      cur = m[1].trim();
+      curLines = [];
+    } else if (cur) {
+      curLines.push(line);
+    }
+  }
+  if (cur) sections[cur] = curLines.join('\n').trim();
+
+  for (const [projName, content] of Object.entries(sections)) {
+    if (!byProject[projName] || !content) continue; // only projects that actually had sessions
+    const projMemDir = path.join(
+      os.homedir(), '.claude', 'projects',
+      path.join(PROJECTS_ROOT, projName).replace(/\//g, '-'),
+      'memory'
+    );
+    if (!fs.existsSync(projMemDir)) fs.mkdirSync(projMemDir, { recursive: true });
+    const projFile = `daily_${dateStr}.md`;
+    fs.writeFileSync(
+      path.join(projMemDir, projFile),
+      `---\nname: daily-${dateStr}\ndescription: Daily summary ${dateStr}\nmetadata:\n  type: project\n---\n\n${content}\n`
+    );
+    upsertMemoryIndex(path.join(projMemDir, 'MEMORY.md'), projFile, `Daily summary ${dateStr}`);
+    console.log(`[daily] saved project summary: ${projName}`);
+  }
+}
+
+setInterval(() => {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (now.getHours() === 0 && now.getMinutes() === 0 && today !== lastDailyDate) {
+    const yesterday = lastDailyDate;
+    lastDailyDate = today;
+    saveDailySummary(yesterday).catch(e => console.error('[daily] error:', e.message));
+  }
 }, 60000);
 
 const cfg = loadConfig();
 const PORT = cfg.port || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  Base running at http://localhost:${PORT}\n`);
+  console.log(`\n  Base running at http://localhost:${PORT}`);
+  console.log(`  Projects root: ${PROJECTS_ROOT}\n`);
+
+  // On startup, generate yesterday's summary if it was missed (e.g. server was down at midnight)
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterdayFile = path.join(MEMORY_DIR, `daily_${yesterday}.md`);
+  if (!fs.existsSync(yesterdayFile)) {
+    console.log(`[daily] no summary for ${yesterday} — generating now`);
+    setTimeout(() => {
+      saveDailySummary(yesterday).catch(e => console.error('[daily] startup catch-up failed:', e.message));
+    }, 3000);
+  }
 });
