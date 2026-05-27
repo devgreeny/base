@@ -1630,9 +1630,8 @@ function applyNotesTransform() {
 }
 
 function groupLabel(key) {
-  if (key === 'notes') return '~/notes/';
-  if (key === 'consolidated') return 'Consolidated';
-  return 'memory · ' + key.replace('memory:', '');
+  if (key === 'notes') return 'Notes';
+  return key;
 }
 
 async function renderNotesCluster() {

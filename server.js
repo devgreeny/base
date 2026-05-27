@@ -390,20 +390,8 @@ function walkMd(dir, base = dir) {
 app.get('/api/notes', (req, res) => {
   const groups = {};
 
-  // ~/notes/
+  // iCloud notes/ — single source of truth
   groups['notes'] = walkMd(NOTES_DIR).map(f => ({ ...f, label: path.relative(NOTES_DIR, f.path) }));
-
-  // ~/.claude/MEMORY_CONSOLIDATED.md
-  const consolidated = path.join(os.homedir(), '.claude', 'MEMORY_CONSOLIDATED.md');
-  if (fs.existsSync(consolidated)) {
-    const stat = fs.statSync(consolidated);
-    let preview = '';
-    try {
-      const head = fs.readFileSync(consolidated, 'utf8').slice(0, 600);
-      preview = head.replace(/^---[\s\S]*?\n---\n/, '').replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim().slice(0, 160);
-    } catch {}
-    groups['consolidated'] = [{ path: consolidated, name: 'MEMORY_CONSOLIDATED.md', label: 'MEMORY_CONSOLIDATED.md', mtime: stat.mtime.toISOString(), size: stat.size, preview }];
-  }
 
   // Sort each group by mtime desc
   for (const k of Object.keys(groups)) {
@@ -416,9 +404,8 @@ app.get('/api/notes', (req, res) => {
 app.get('/api/notes/content', (req, res) => {
   const p = req.query.path;
   if (!p) return res.status(400).json({ error: 'path required' });
-  const roots = [NOTES_DIR, path.join(os.homedir(), '.claude')];
   const abs = path.resolve(p);
-  if (!roots.some(r => abs.startsWith(r))) return res.status(403).json({ error: 'forbidden path' });
+  if (!abs.startsWith(NOTES_DIR)) return res.status(403).json({ error: 'forbidden path' });
   if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
   res.json({ path: abs, content: fs.readFileSync(abs, 'utf8') });
 });
@@ -426,9 +413,8 @@ app.get('/api/notes/content', (req, res) => {
 app.delete('/api/notes', (req, res) => {
   const p = req.query.path;
   if (!p) return res.status(400).json({ error: 'path required' });
-  const roots = [NOTES_DIR, path.join(os.homedir(), '.claude')];
   const abs = path.resolve(p);
-  if (!roots.some(r => abs.startsWith(r))) return res.status(403).json({ error: 'forbidden path' });
+  if (!abs.startsWith(NOTES_DIR)) return res.status(403).json({ error: 'forbidden path' });
   if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
   try {
     fs.unlinkSync(abs);
