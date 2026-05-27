@@ -1013,6 +1013,7 @@
         <div id="cluster-viz-wrap">
           <svg id="cluster-svg" xmlns="http://www.w3.org/2000/svg"></svg>
           <div id="cluster-controls">
+            <button class="cluster-ctrl" id="cluster-refresh" title="Refresh">↺</button>
             <button class="cluster-ctrl" id="cluster-zoom-in" title="Zoom in">+</button>
             <button class="cluster-ctrl" id="cluster-zoom-out" title="Zoom out">−</button>
             <button class="cluster-ctrl" id="cluster-reset" title="Reset view">⊙</button>
@@ -1032,6 +1033,7 @@
           <div id="notes-cluster-pane">
             <svg id="notes-cluster-svg" xmlns="http://www.w3.org/2000/svg"></svg>
             <div id="notes-cluster-controls">
+              <button class="cluster-ctrl" id="notes-refresh" title="Refresh">↺</button>
               <button class="cluster-ctrl" id="notes-zoom-in" title="Zoom in">+</button>
               <button class="cluster-ctrl" id="notes-zoom-out" title="Zoom out">−</button>
               <button class="cluster-ctrl" id="notes-reset" title="Reset view">⊙</button>
@@ -1453,11 +1455,22 @@ function seededRandom(seed) {
   };
 }
 
-function computeCentroids(n, w, h) {
+function computeCentroids(n, w, h, clusterRadii) {
   if (n === 0) return [];
   if (n === 1) return [[w / 2, h / 2]];
   const cx = w / 2, cy = h / 2;
-  const R = Math.min(w, h) * 0.32;
+  let R = Math.min(w, h) * 0.32;
+
+  if (clusterRadii && clusterRadii.length === n) {
+    let maxAdjacentSum = 0;
+    for (let i = 0; i < n; i++)
+      maxAdjacentSum = Math.max(maxAdjacentSum, clusterRadii[i] + clusterRadii[(i + 1) % n]);
+    const needed = (maxAdjacentSum + 50) / (2 * Math.sin(Math.PI / n));
+    const maxClusterR = Math.max(...clusterRadii);
+    const ceiling = Math.min(w, h) / 2 - maxClusterR - 50;
+    R = Math.min(Math.max(R, needed), Math.max(ceiling, R));
+  }
+
   return Array.from({ length: n }, (_, i) => {
     const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
     return [cx + R * Math.cos(angle), cy + R * Math.sin(angle)];
@@ -1487,14 +1500,15 @@ function renderClusterViz({ svg, viewportId, groups, colorFn, dotMeta, transform
   svg.appendChild(g);
 
   const N = themeNames.length;
-  const centroids = computeCentroids(N, W, H);
+  const clusterRadii = themeNames.map(name => Math.max(28, Math.sqrt(groups.get(name).length) * 22));
+  const centroids = computeCentroids(N, W, H, clusterRadii);
 
   themeNames.forEach((name, idx) => {
     const items = groups.get(name);
     const [cx, cy] = centroids[idx];
     const color = colorFn(name);
     const M = items.length;
-    const clusterR = Math.max(28, Math.sqrt(M) * 22);
+    const clusterR = clusterRadii[idx];
 
     const positions = items.map((_, i) => {
       if (M === 1) return [cx, cy];
@@ -1664,14 +1678,15 @@ async function renderClusteredTodos() {
   svg.appendChild(g);
 
   const N = themeNames.length;
-  const centroids = computeCentroids(N, W, H);
+  const clusterRadii = themeNames.map(name => Math.max(28, Math.sqrt(groups.get(name).length) * 22));
+  const centroids = computeCentroids(N, W, H, clusterRadii);
 
   themeNames.forEach((name, idx) => {
     const items = groups.get(name);
     const [cx, cy] = centroids[idx];
     const color = themeColor(name) || '#888';
     const M = items.length;
-    const clusterR = Math.max(28, Math.sqrt(M) * 22);
+    const clusterR = clusterRadii[idx];
 
     // Vertex positions: regular M-gon
     const positions = items.map((_, i) => {
@@ -2005,6 +2020,9 @@ loadConfig();
 loadClaudeMd();
 loadMemory();
 loadCommands();
+
+document.getElementById('cluster-refresh')?.addEventListener('click', () => renderClusteredTodos());
+document.getElementById('notes-refresh')?.addEventListener('click', () => renderNotesCluster());
 </script>
 </body>
 </html>
