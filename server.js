@@ -573,45 +573,12 @@ wss.on('connection', (ws, req) => {
         return;
       }
     } catch {}
-    if (termNum === 1) lastInteraction = Date.now();
     sess.term.write(str);
   });
 
   ws.on('close', () => { if (sess.ws === ws) sess.ws = null; });
   ws.on('error', () => { if (sess.ws === ws) sess.ws = null; });
 });
-
-// ── Heartbeat — auto-restart after 60 min idle ────────────────────────────────
-
-let lastInteraction = Date.now();
-let heartbeatFired = false;
-
-function restartClaude() {
-  const sess = SESSIONS[1];
-  if (sess.term) { try { sess.term.kill(); } catch {} sess.term = null; }
-  sess.buf = '';
-  const notice = '\r\n\x1b[33m[restarting Claude after idle]\x1b[0m\r\n';
-  sess.buf += notice;
-  if (sess.ws?.readyState === 1) sess.ws.send(notice);
-  setTimeout(() => {
-    spawnSession(1);
-    if (sess.ws?.readyState === 1 && sess.buf) sess.ws.send(sess.buf);
-  }, 1000);
-}
-
-setInterval(() => {
-  const idleMs = Date.now() - lastInteraction;
-  const SIXTY_MIN = 60 * 60 * 1000;
-  if (idleMs < SIXTY_MIN) { heartbeatFired = false; return; }
-  if (heartbeatFired) return;
-  heartbeatFired = true;
-
-  const sess = SESSIONS[1];
-  if (!sess.term) return;
-
-  console.log('[heartbeat] 60 min idle — restarting Claude');
-  restartClaude();
-}, 60000);
 
 // ── Daily memory — one global summary + per-project appends at midnight ────────
 
