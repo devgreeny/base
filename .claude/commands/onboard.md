@@ -36,9 +36,13 @@ For each target below, run this idempotent procedure:
 | `~/skills` | `$ICLOUD/skills` |
 | `~/CLAUDE.md` (file) | `$ICLOUD/CLAUDE.md` |
 
-**Per-project memory:** for each project in `config.json`, derive `<encoded>` = `$(echo $PROJECTS_ROOT/<projName> | tr / -)` and symlink:
+**Per-project memory:** for each project in `config.json`, derive `<encoded>` = `$(echo $PROJECTS_ROOT/<projName> | tr / -)`. iCloud memory is split into active/ and inactive/ buckets:
+- Active projects (`pb`, `base`, `Clockify_alt`, `wheredhego_v1`): iCloud path = `$ICLOUD/memory/active/<projName>`
+- Inactive projects (everything else): iCloud path = `$ICLOUD/memory/inactive/<projName>`
+
+If unsure, check which bucket the dir actually exists in within iCloud and symlink to that. Symlink:
 - Local: `~/.claude/projects/<encoded>/memory`
-- iCloud: `$ICLOUD/memory/<projName>`
+- iCloud: the matching bucket
 
 Create the encoded parent dir if missing.
 
