@@ -12,9 +12,15 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const CONFIG_PATH = path.join(__dirname, 'config.json');
-const TODOS_PATH  = path.join(__dirname, 'todos.json');
 const DUMPS_DIR   = path.join(__dirname, 'data', 'dumps');
 if (!fs.existsSync(DUMPS_DIR)) fs.mkdirSync(DUMPS_DIR, { recursive: true });
+
+// iCloud-backed shared state (single source of truth across machines)
+const ICLOUD     = path.join(os.homedir(), 'Library', 'Mobile Documents', 'com~apple~CloudDocs', 'claude');
+const TODOS_PATH = path.join(ICLOUD, 'todos.json');
+const NOTES_DIR  = path.join(ICLOUD, 'notes');
+if (!fs.existsSync(ICLOUD))    fs.mkdirSync(ICLOUD,    { recursive: true });
+if (!fs.existsSync(NOTES_DIR)) fs.mkdirSync(NOTES_DIR, { recursive: true });
 
 // Detect projects root for this machine
 const PROJECTS_ROOT = (() => {
@@ -357,9 +363,6 @@ app.delete('/api/dumps/:ts', (req, res) => {
 });
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
-
-const NOTES_DIR = path.join(os.homedir(), 'notes');
-if (!fs.existsSync(NOTES_DIR)) fs.mkdirSync(NOTES_DIR, { recursive: true });
 
 function walkMd(dir, base = dir) {
   const out = [];

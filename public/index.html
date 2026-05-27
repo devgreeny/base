@@ -25,7 +25,6 @@
     --accent-dim: #2a4a37;
     --red: #cc5555;
     --amber: #c4a261;
-    --sidebar-w: 280px;
     --header-h: 38px;
     --term-header-h: 30px;
     --font-mono: 'JetBrains Mono', 'Courier New', monospace;
@@ -96,46 +95,6 @@
     overflow: hidden;
   }
 
-  /* ── Sidebar ─────────────────────────────────── */
-  #sidebar {
-    width: var(--sidebar-w);
-    flex-shrink: 0;
-    border-right: 1px solid var(--border);
-    overflow-y: auto;
-    overflow-x: hidden;
-    background: var(--bg1);
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
-  #sidebar::-webkit-scrollbar { width: 4px; }
-  #sidebar::-webkit-scrollbar-thumb { background: var(--border); }
-
-  .panel {
-    border-bottom: 1px solid var(--border);
-    animation: fadeIn 0.25s ease;
-  }
-
-  .panel-header {
-    font-size: 9px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    padding: 9px 14px 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg1);
-    cursor: pointer;
-    user-select: none;
-  }
-  .panel-header:hover { color: var(--text); }
-  .panel-header .panel-title { pointer-events: none; }
-
-  .panel-body {
-    padding: 10px 14px;
-    background: var(--bg);
-  }
-  .panel-body.collapsed { display: none; }
 
   /* ── Shared form elements ─────────────────────── */
   select, input[type="text"], input[type="number"] {
@@ -225,14 +184,6 @@
     text-transform: uppercase;
   }
   .feedback-line.visible { opacity: 1; }
-
-  /* ── CLAUDE.md Panel ─────────────────────────── */
-  .claudemd-path {
-    font-size: 9px;
-    color: var(--text-faint);
-    margin-bottom: 6px;
-    word-break: break-all;
-  }
 
   .sub-label {
     font-size: 8px;
@@ -360,17 +311,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 2;
-    min-width: 0;
-  }
-
-  #add-project-row {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-  }
-
-  #add-project-input {
-    flex: 1;
     min-width: 0;
   }
 
@@ -922,59 +862,6 @@
 
 <div id="content">
 
-  <div id="sidebar">
-
-    <!-- CLAUDE.md (global only) -->
-    <div class="panel" id="claudemd-panel">
-      <div class="panel-header" data-panel="claudemd-body">
-        <span class="panel-title">CLAUDE.md</span>
-        <span>▾</span>
-      </div>
-      <div class="panel-body collapsed" id="claudemd-body">
-        <div class="claudemd-path" id="global-claudemd-path"></div>
-        <textarea id="global-claudemd-input" style="min-height:120px;max-height:280px"></textarea>
-        <div class="btn-row">
-          <button class="btn btn-accent" id="save-global-claudemd-btn">Save</button>
-        </div>
-        <div class="feedback-line" id="global-claudemd-feedback"></div>
-      </div>
-    </div>
-
-    <!-- Slash Commands -->
-    <div class="panel" id="commands-panel">
-      <div class="panel-header" data-panel="commands-body">
-        <span class="panel-title">Slash Commands</span>
-        <span>▸</span>
-      </div>
-      <div class="panel-body collapsed" id="commands-body">
-        <div id="commands-list"></div>
-      </div>
-    </div>
-
-    <!-- Settings -->
-    <div class="panel" id="settings-panel">
-      <div class="panel-header" data-panel="settings-body">
-        <span class="panel-title">Settings</span>
-        <span>▸</span>
-      </div>
-      <div class="panel-body collapsed" id="settings-body">
-        <label class="field-label">Projects</label>
-        <div id="projects-list"></div>
-        <div id="add-project-row">
-          <input type="text" id="add-project-input" placeholder="/path/to/project">
-          <button class="btn" id="add-project-btn" style="flex:0;padding:5px 10px;white-space:nowrap">Add</button>
-        </div>
-        <label class="field-label" style="margin-top:12px">Port</label>
-        <input type="number" id="port-input" value="3000" style="width:80px">
-        <div class="btn-row" style="margin-top:10px">
-          <button class="btn btn-accent" id="save-settings-btn">Save</button>
-        </div>
-        <div class="feedback-line" id="settings-feedback"></div>
-      </div>
-    </div>
-
-  </div><!-- /sidebar -->
-
   <div id="main">
 
     <div id="tabs">
@@ -1075,17 +962,6 @@ function showFeedback(id, msg) {
   setTimeout(() => el.classList.remove('visible'), 2500);
 }
 
-// ── Panel collapse toggle ─────────────────────────────────────────────────────
-
-document.querySelectorAll('.panel-header[data-panel]').forEach(header => {
-  header.addEventListener('click', () => {
-    const body = document.getElementById(header.dataset.panel);
-    const arrow = header.querySelector('span:last-child');
-    body.classList.toggle('collapsed');
-    if (arrow) arrow.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
-  });
-});
-
 // ── Terminal factory ──────────────────────────────────────────────────────────
 
 const TERM_THEME = {
@@ -1149,80 +1025,6 @@ function spawnTerminal(containerId, wsPath, dotId, headerDotId) {
 
 const t1 = spawnTerminal('term1-container', '/terminal/1', 'dot1', 'tdot1');
 const t2 = spawnTerminal('term2-container', '/terminal/2', 'dot2', 'tdot2');
-
-// ── Config + Settings ─────────────────────────────────────────────────────────
-
-let config = {};
-
-async function loadConfig() {
-  const res = await fetch('/api/config');
-  config = await res.json();
-  renderProjectsList(config.projects || []);
-  document.getElementById('port-input').value = config.port || 3000;
-}
-
-function renderProjectsList(projects) {
-  const el = document.getElementById('projects-list');
-  el.innerHTML = '';
-  projects.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'project-row';
-    row.innerHTML = `
-      <span class="project-name" title="${p}">${p.split('/').pop()}</span>
-      <span class="project-path-full" title="${p}">${p}</span>
-      <button class="icon-btn" data-index="${i}" title="Remove">✕</button>
-    `;
-    row.querySelector('.icon-btn').addEventListener('click', () => {
-      config.projects.splice(i, 1);
-      renderProjectsList(config.projects);
-    });
-    el.appendChild(row);
-  });
-}
-
-document.getElementById('add-project-btn').addEventListener('click', () => {
-  const input = document.getElementById('add-project-input');
-  const val = input.value.trim();
-  if (!val) return;
-  if (!config.projects) config.projects = [];
-  config.projects.push(val);
-  renderProjectsList(config.projects);
-  input.value = '';
-});
-
-document.getElementById('add-project-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('add-project-btn').click();
-});
-
-document.getElementById('save-settings-btn').addEventListener('click', async () => {
-  config.port = parseInt(document.getElementById('port-input').value) || 3000;
-  await fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
-  });
-  showFeedback('settings-feedback', 'Saved — restart server to apply port change');
-  loadConfig();
-});
-
-// ── CLAUDE.md (global only) ───────────────────────────────────────────────────
-
-async function loadClaudeMd() {
-  const global = await fetch('/api/claude-md').then(r => r.json());
-  document.getElementById('global-claudemd-input').value = global.content;
-  document.getElementById('global-claudemd-path').textContent = global.path;
-}
-
-document.getElementById('save-global-claudemd-btn').addEventListener('click', async () => {
-  const content = document.getElementById('global-claudemd-input').value;
-  await fetch('/api/claude-md', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project: null, content }),
-  });
-  showFeedback('global-claudemd-feedback', 'Saved');
-});
-
 
 async function loadMemory() {
   return fetch('/api/memory').then(r => r.json());
@@ -1957,37 +1759,6 @@ async function openNote(p) {
 
 window.addEventListener('resize', () => { if (activeTab === 'notes') renderNotesCluster(); });
 
-// ── Help tab ──────────────────────────────────────────────────────────────────
-
-async function loadCommands() {
-  const { commands } = await fetch('/api/commands').then(r => r.json());
-  const list = document.getElementById('commands-list');
-  list.innerHTML = '';
-  if (!commands.length) {
-    list.innerHTML = '<div style="color:var(--text-faint);font-style:italic;font-size:11px;padding:8px">No slash commands in ~/.claude/commands/</div>';
-    return;
-  }
-  commands.forEach(c => {
-    const item = document.createElement('div');
-    item.className = 'command-item';
-    item.innerHTML = `
-      <div class="command-name">/${escapeHtml(c.name)}</div>
-      <div class="command-desc">${escapeHtml(c.description || '(no description)')}</div>
-      ${c.argumentHint ? `<div class="command-args">args: ${escapeHtml(c.argumentHint)}</div>` : ''}
-      <div class="command-body-toggle">▸ Show prompt</div>
-      <div class="command-body">${escapeHtml(c.body)}</div>
-    `;
-    item.querySelector('.command-body-toggle').addEventListener('click', () => {
-      const body = item.querySelector('.command-body');
-      const toggle = item.querySelector('.command-body-toggle');
-      body.classList.toggle('open');
-      toggle.textContent = body.classList.contains('open') ? '▾ Hide prompt' : '▸ Show prompt';
-    });
-    list.appendChild(item);
-  });
-}
-
-
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -2018,10 +1789,7 @@ document.addEventListener('keydown', e => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-loadConfig();
-loadClaudeMd();
 loadMemory();
-loadCommands();
 
 document.getElementById('cluster-refresh')?.addEventListener('click', () => renderClusteredTodos());
 document.getElementById('notes-refresh')?.addEventListener('click', () => renderNotesCluster());
