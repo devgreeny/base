@@ -392,16 +392,6 @@
   .header-action:disabled { opacity: 0.6; cursor: wait; }
   .btn:disabled { opacity: 0.6; cursor: wait; }
 
-  #idle-timer {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-faint);
-    letter-spacing: 0.06em;
-    text-transform: none;
-  }
-  #idle-timer.warn { color: var(--amber); }
-  #idle-timer.crit { color: var(--red); }
-
   /* ── Terminals ───────────────────────────────── */
   #terminals {
     flex: 1;
@@ -934,18 +924,6 @@
 
   <div id="sidebar">
 
-    <!-- Memory panel: countdown + save button -->
-    <div class="panel" id="memory-panel">
-      <div class="panel-header" style="cursor:default">
-        <span class="panel-title">Memory</span>
-        <span id="idle-timer" title="Auto-save countdown — fires at 0:00">60:00</span>
-      </div>
-      <div class="panel-body">
-        <button class="btn btn-accent" id="save-memory-btn" style="width:100%">Save Memory Now</button>
-        <div class="feedback-line" id="save-memory-feedback"></div>
-      </div>
-    </div>
-
     <!-- CLAUDE.md (global only) -->
     <div class="panel" id="claudemd-panel">
       <div class="panel-header" data-panel="claudemd-body">
@@ -1264,96 +1242,6 @@ async function sendToTerminal(text, termNum = 1) {
     alert(`Could not reach terminal: ${e.message}`);
   }
 }
-
-// ── Idle timer + Save Memory ──────────────────────────────────────────────────
-
-let lastInteractionTs = Date.now();
-const AUTO_SAVE_AFTER_MS = 60 * 60 * 1000; // 1h
-let savingMemory = false;
-let autoFiredForThisIdle = false;
-
-function bumpInteraction() {
-  lastInteractionTs = Date.now();
-  autoFiredForThisIdle = false;
-}
-
-// Reset idle clock when user types into Terminal 1
-if (t1?.term) t1.term.onData(() => bumpInteraction());
-
-function stripAnsi(str) {
-  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
-            .replace(/\x1b\][^\x07]*\x07/g, '')
-            .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '');
-}
-
-function fmtCountdown(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, '0')}`;
-}
-
-function tickIdleTimer() {
-  const elapsed = Date.now() - lastInteractionTs;
-  const remaining = AUTO_SAVE_AFTER_MS - elapsed;
-  const el = document.getElementById('idle-timer');
-  if (el) {
-    el.textContent = fmtCountdown(remaining);
-    // Warn when 30+ minutes have passed (i.e., < 30 min remaining); crit at < 5 min
-    el.classList.toggle('warn', remaining > 0 && remaining <= 30 * 60 * 1000 && remaining > 5 * 60 * 1000);
-    el.classList.toggle('crit', remaining <= 5 * 60 * 1000);
-  }
-  if (elapsed >= AUTO_SAVE_AFTER_MS && !autoFiredForThisIdle && !savingMemory) {
-    autoFiredForThisIdle = true;
-    saveMemoryFlow(true);
-  }
-}
-setInterval(tickIdleTimer, 1000);
-
-async function saveMemoryFlow(isAuto = false) {
-  if (savingMemory) return;
-  savingMemory = true;
-  const btn = document.getElementById('save-memory-btn');
-  if (btn) { btn.disabled = true; btn.textContent = isAuto ? 'Auto-saving…' : 'Saving…'; }
-
-  try {
-    // Mark Terminal 1 buffer position
-    await fetch('/api/terminal/mark', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ termNum: 1 }),
-    });
-    // Send /wrap to Claude
-    await sendToTerminal('/wrap\r');
-    // Wait for response (45s, same as server-side heartbeat)
-    await new Promise(r => setTimeout(r, 45000));
-    // Capture
-    const cap = await fetch('/api/terminal/capture?termNum=1').then(r => r.json());
-    const content = stripAnsi(cap.content || '').trim();
-    if (content) {
-      const today = new Date().toISOString().slice(0, 10);
-      await fetch('/api/memory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content,
-          description: `Session memory ${today}${isAuto ? ' (auto)' : ''}`,
-          type: 'project',
-        }),
-      });
-    }
-    bumpInteraction();
-    if (btn) btn.textContent = 'Saved ✓';
-    setTimeout(() => { if (btn) btn.textContent = 'Save Memory Now'; }, 2500);
-  } catch (e) {
-    if (btn) btn.textContent = 'Failed';
-    setTimeout(() => { if (btn) btn.textContent = 'Save Memory Now'; }, 2500);
-  } finally {
-    savingMemory = false;
-    if (btn) btn.disabled = false;
-  }
-}
-
-document.getElementById('save-memory-btn')?.addEventListener('click', () => saveMemoryFlow(false));
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
